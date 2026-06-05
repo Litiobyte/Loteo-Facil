@@ -2,16 +2,17 @@
 
 namespace App\Filament\Resources\Propietarios;
 
+use App\Domain\Owners\Services\PropietarioEligibleUserService;
 use App\Filament\Resources\Propietarios\Pages\CreatePropietario;
 use App\Filament\Resources\Propietarios\Pages\EditPropietario;
 use App\Filament\Resources\Propietarios\Pages\ListPropietarios;
 use App\Filament\Resources\Propietarios\RelationManagers\LotesRelationManager;
-use App\Rules\ValidChileanRut;
-use App\Support\ChileanRut;
 use App\Models\Comuna;
 use App\Models\Propietario;
 use App\Models\Region;
 use App\Models\User;
+use App\Rules\ValidChileanRut;
+use App\Support\ChileanRut;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -40,6 +41,8 @@ class PropietarioResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
+        $eligibleUserService = app(PropietarioEligibleUserService::class);
+
         return $schema
             ->components([
                 Select::make('user_id')
@@ -47,7 +50,7 @@ class PropietarioResource extends Resource
                     ->relationship(
                         name: 'user',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn (Builder $query, ?Propietario $record = null): Builder => static::eligibleUsersForFormQuery($query, $record)
+                        modifyQueryUsing: fn (Builder $query, ?Propietario $record = null): Builder => $eligibleUserService->eligibleUsersForFormQuery($query, $record)
                     )
                     ->getOptionLabelFromRecordUsing(fn (User $record): string => "{$record->name} ({$record->email})")
                     ->searchable(['name', 'email'])
@@ -72,7 +75,7 @@ class PropietarioResource extends Resource
                     ->maxLength(20)
                     ->formatStateUsing(fn (?string $state): ?string => ChileanRut::normalize($state))
                     ->dehydrateStateUsing(fn (?string $state): ?string => ChileanRut::normalize($state))
-                    ->rule(new ValidChileanRut())
+                    ->rule(new ValidChileanRut)
                     ->unique(ignoreRecord: true),
                 TextInput::make('telefono')
                     ->label('Telefono')
@@ -114,11 +117,11 @@ class PropietarioResource extends Resource
                 Select::make('estado_civil')
                     ->label('Estado civil')
                     ->options([
-                        'soltero' => 'Soltero',
-                        'casado' => 'Casado',
-                        'divorciado' => 'Divorciado',
-                        'viudo' => 'Viudo',
-                        'union_civil' => 'Union civil',
+                        'Soltero' => 'Soltero',
+                        'Casado' => 'Casado',
+                        'Divorciado' => 'Divorciado',
+                        'Viudo' => 'Viudo',
+                        'Union civil' => 'Union civil',
                     ])
                     ->required(),
                 TextInput::make('email')
@@ -132,22 +135,12 @@ class PropietarioResource extends Resource
 
     public static function eligibleUsersQuery(Builder $query): Builder
     {
-        return $query
-            ->whereHas('roles', fn (Builder $roles): Builder => $roles->where('name', 'propietario'))
-            ->whereDoesntHave('propietario');
+        return app(PropietarioEligibleUserService::class)->eligibleUsersQuery($query);
     }
 
     public static function eligibleUsersForFormQuery(Builder $query, ?Propietario $record = null): Builder
     {
-        return $query
-            ->whereHas('roles', fn (Builder $roles): Builder => $roles->where('name', 'propietario'))
-            ->where(function (Builder $users) use ($record): void {
-                $users->whereDoesntHave('propietario');
-
-                if ($record?->user_id) {
-                    $users->orWhere('id', $record->user_id);
-                }
-            });
+        return app(PropietarioEligibleUserService::class)->eligibleUsersForFormQuery($query, $record);
     }
 
     public static function table(Table $table): Table
@@ -169,7 +162,7 @@ class PropietarioResource extends Resource
                     ->sortable(),
                 TextColumn::make('lotes_activos_m2_sum')
                     ->label('Hectareas totales')
-                    ->formatStateUsing(fn ($state): string => number_format(((float) ($state ?? 0)) / 10000, 2, ',', '.') . ' ha')
+                    ->formatStateUsing(fn ($state): string => number_format(((float) ($state ?? 0)) / 10000, 2, ',', '.').' ha')
                     ->sortable(),
             ])
             ->filters([

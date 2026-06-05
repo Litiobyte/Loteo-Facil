@@ -191,4 +191,56 @@ class OwnerDomainTest extends TestCase
 
         $service->assign($owner, $lote);
     }
+
+    public function test_cannot_unassign_lote_when_estado_is_vendido(): void
+    {
+        $ownerUser = User::factory()->create();
+        $ownerUser->assignRole('propietario');
+        $owner = Propietario::factory()->create(['user_id' => $ownerUser->id]);
+
+        $lote = Lote::factory()->create(['estado' => 'disponible']);
+
+        $service = app(LoteOwnershipAssignmentService::class);
+        $service->assign($owner, $lote);
+
+        $lote->update(['estado' => 'vendido']);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('No se puede desasignar un lote vendido.');
+
+        $service->unassign($owner, $lote);
+    }
+
+    public function test_cannot_unassign_lote_when_estado_is_not_reservado(): void
+    {
+        $ownerUser = User::factory()->create();
+        $ownerUser->assignRole('propietario');
+        $owner = Propietario::factory()->create(['user_id' => $ownerUser->id]);
+
+        $lote = Lote::factory()->create(['estado' => 'disponible']);
+
+        $service = app(LoteOwnershipAssignmentService::class);
+        $service->assign($owner, $lote);
+
+        $lote->refresh()->update(['estado' => 'disponible']);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('Solo se pueden desasignar lotes en estado reservado.');
+
+        $service->unassign($owner, $lote);
+    }
+
+    public function test_cannot_unassign_lote_without_active_assignment(): void
+    {
+        $ownerUser = User::factory()->create();
+        $ownerUser->assignRole('propietario');
+        $owner = Propietario::factory()->create(['user_id' => $ownerUser->id]);
+
+        $lote = Lote::factory()->create(['estado' => 'reservado']);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('No existe una asignacion activa para desasignar.');
+
+        app(LoteOwnershipAssignmentService::class)->unassign($owner, $lote);
+    }
 }

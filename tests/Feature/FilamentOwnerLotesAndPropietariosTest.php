@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Owners\Services\LoteEligibilityService;
 use App\Filament\Owner\Resources\Lotes\LoteResource as OwnerLoteResource;
-use App\Filament\Resources\Propietarios\RelationManagers\LotesRelationManager;
 use App\Filament\Resources\Propietarios\PropietarioResource;
 use App\Models\Comuna;
 use App\Models\Etapa;
-use App\Models\Region;
 use App\Models\Lote;
 use App\Models\Propietario;
+use App\Models\Region;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -146,7 +146,7 @@ class FilamentOwnerLotesAndPropietariosTest extends TestCase
             'status' => 'unassigned',
         ]);
 
-        $options = LotesRelationManager::assignableLoteOptions();
+        $options = app(LoteEligibilityService::class)->assignableLoteOptions();
 
         $this->assertArrayNotHasKey($loteActive->id, $options);
         $this->assertSame('LT-FREE', $options[$loteAvailable->id] ?? null);
@@ -174,7 +174,6 @@ class FilamentOwnerLotesAndPropietariosTest extends TestCase
             'status' => 'unassigned',
         ]);
 
-        $this->assertSame('lotesActivos', LotesRelationManager::getRelationshipName());
         $this->assertSame(['LT-ACTIVE-RM'], $owner->lotesActivos()->pluck('codigo')->all());
     }
 

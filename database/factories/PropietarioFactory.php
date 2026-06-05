@@ -36,7 +36,7 @@ class PropietarioFactory extends Factory
             'comuna_id' => $comuna?->id,
             'nacionalidad' => 'Chilena',
             'profesion' => fake()->jobTitle(),
-            'estado_civil' => fake()->randomElement(['Soltero', 'Casado', 'Divorciado', 'Viudo']),
+            'estado_civil' => fake()->randomElement(['Soltero', 'Casado', 'Divorciado', 'Viudo', 'Union civil']),
             'email' => fake()->unique()->safeEmail(),
         ];
     }

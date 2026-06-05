@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Propietarios\RelationManagers;
 
+use App\Domain\Owners\Services\LoteEligibilityService;
 use App\Domain\Owners\Services\LoteOwnershipAssignmentService;
 use App\Models\Lote;
 use DomainException;
@@ -11,7 +12,6 @@ use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 
 class LotesRelationManager extends RelationManager
 {
@@ -47,10 +47,11 @@ class LotesRelationManager extends RelationManager
             ->headerActions([
                 Action::make('asignarLote')
                     ->label('Asignar lote')
+                    ->authorize(fn (): bool => auth()->user()?->can('update', $this->ownerRecord) ?? false)
                     ->form([
                         Select::make('lote_id')
                             ->label('Lote')
-                            ->options(fn (): array => self::assignableLoteOptions())
+                            ->options(fn (): array => app(LoteEligibilityService::class)->assignableLoteOptions())
                             ->searchable()
                             ->preload()
                             ->required(),
@@ -84,12 +85,18 @@ class LotesRelationManager extends RelationManager
                     ->icon('heroicon-o-user-minus')
                     ->requiresConfirmation()
                     ->visible(fn (Lote $record): bool => $record->pivot?->status === 'active')
+                    ->authorize(fn (): bool => auth()->user()?->can('update', $this->ownerRecord) ?? false)
                     ->action(function (Lote $record): void {
                         try {
                             app(LoteOwnershipAssignmentService::class)->unassign(
                                 propietario: $this->ownerRecord,
                                 lote: $record,
                             );
+
+                            Notification::make()
+                                ->title('Lote desasignado correctamente')
+                                ->success()
+                                ->send();
                         } catch (DomainException $exception) {
                             Notification::make()
                                 ->title('No se pudo desasignar')
@@ -102,19 +109,5 @@ class LotesRelationManager extends RelationManager
             ->toolbarActions([
                 //
             ]);
-    }
-
-    public static function assignableLoteOptions(): array
-    {
-        return Lote::query()
-            ->where('estado', 'disponible')
-            ->whereDoesntHave(
-                'propietarios',
-                fn (Builder $relation): Builder => $relation
-                    ->where('lote_propietario.status', 'active')
-            )
-            ->orderBy('codigo')
-            ->pluck('codigo', 'id')
-            ->all();
     }
 }
