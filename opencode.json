@@ -1,0 +1,51 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "skills": {
+        "paths": [
+            ".opencode/skills"
+        ]
+    },
+    "agent": {
+        "laravel-architect": {
+            "description": "Designs Laravel architecture, data model, and domain boundaries for maintainable delivery.",
+            "mode": "subagent",
+            "model": "github-copilot/gpt-5.3-codex"
+        },
+        "financial-logic-specialist": {
+            "description": "Implements and validates financial domain rules with strict consistency and traceability.",
+            "mode": "subagent",
+            "model": "anthropic/claude-sonnet-4-6"
+        },
+        "filament-developer": {
+            "description": "Builds Filament resources, forms, tables, and admin workflows with clean boundaries.",
+            "mode": "subagent",
+            "model": "github-copilot/gpt-5.3-codex"
+        },
+        "financial-qa": {
+            "description": "Tests financial flows and edge cases with a low-cost model profile.",
+            "mode": "subagent",
+            "model": "openai/gpt-4.1-mini"
+        },
+        "code-reviewer": {
+            "description": "Performs practical code reviews focused on bugs, risk, permissions, and test gaps.",
+            "mode": "subagent",
+            "model": "openai/gpt-4.1-mini"
+        },
+        "technical-documenter": {
+            "description": "Produces clear, implementation-faithful technical and functional documentation.",
+            "mode": "subagent",
+            "model": "openai/gpt-4.1-mini"
+        }
+    },
+    "mcp": {
+        "laravel-boost": {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "php",
+                "artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}

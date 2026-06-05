@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "/usr/local/Cellar/php@8.3/8.3.22/bin/php",
+            "args": [
+                "/Users/hernanaranda/Documents/Loteo Feliz/artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}
