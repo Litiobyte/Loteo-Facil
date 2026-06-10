@@ -2,10 +2,15 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Owner\Widgets\FinancialSummaryWidget;
+use App\Filament\Owner\Widgets\NextPaymentEstimateWidget;
+use App\Filament\Owner\Widgets\OverdueAlertsWidget;
+use App\Filament\Owner\Widgets\WelcomeWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -41,6 +46,18 @@ class OwnerPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Owner/Pages'), for: 'App\Filament\Owner\Pages')
             ->pages([
                 Dashboard::class,
+            ])
+            ->widgets([
+                WelcomeWidget::class,
+                OverdueAlertsWidget::class,
+                FinancialSummaryWidget::class,
+                NextPaymentEstimateWidget::class,
+            ])
+            ->navigationGroups([
+                NavigationGroup::make('Finanzas')
+                    ->icon('heroicon-o-currency-dollar'),
+                NavigationGroup::make('Mis Datos')
+                    ->icon('heroicon-o-user'),
             ])
             ->middleware([
                 EncryptCookies::class,

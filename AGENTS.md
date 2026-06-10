@@ -34,7 +34,7 @@ This file defines how to use project agents and skills consistently across openc
 
 - High:
   - `laravel-architect`: `github-copilot/gpt-5.3-codex`
-  - `financial-logic-specialist`: `anthropic/claude-sonnet-4-6`
+  - `financial-logic-specialist`: `github-copilot/gpt-5.3-codex`
 - Medium-high:
   - `filament-developer`: `github-copilot/gpt-5.3-codex`
 - Low/medium:

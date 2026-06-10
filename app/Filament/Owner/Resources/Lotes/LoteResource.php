@@ -7,20 +7,24 @@ use App\Models\Lote;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use UnitEnum;
 
 class LoteResource extends Resource
 {
     protected static ?string $model = Lote::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMap;
+    protected static string|BackedEnum|null $navigationIcon = null;
 
     protected static ?string $navigationLabel = 'Mis lotes';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Mis Datos';
+
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $modelLabel = 'Lote';
 

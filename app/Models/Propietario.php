@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Charges\Enums\ChargeStatus;
 use App\Support\ChileanRut;
 use Database\Factories\PropietarioFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Propietario extends Model
 {
@@ -76,5 +78,25 @@ class Propietario extends Model
     public function comuna(): BelongsTo
     {
         return $this->belongsTo(Comuna::class);
+    }
+
+    public function charges(): HasMany
+    {
+        return $this->hasMany(PartnerCharge::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function chargesPending(): HasMany
+    {
+        return $this->charges()->where('status', ChargeStatus::Pending->value);
+    }
+
+    public function totalPendingAmount(): float
+    {
+        return (float) $this->chargesPending()->sum('remaining_amount');
     }
 }

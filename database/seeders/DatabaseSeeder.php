@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use App\Models\Propietario;
 use App\Models\Comuna;
+use App\Models\Propietario;
+use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
@@ -18,15 +18,23 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([
-            RegionSeeder::class,
-            EtapaSeeder::class,
-        ]);
-
+        // Primero crear los roles
         Role::findOrCreate('super_admin', 'web');
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('propietario', 'web');
 
+        // Luego ejecutar los seeders de datos geográficos y de negocio
+        $this->call([
+            RegionSeeder::class,
+            EtapaSeeder::class,
+            LoteSeeder::class,
+            PropietarioSeeder::class,
+            ExpenseCategorySeeder::class,
+            ExpenseSeeder::class,
+            PartnerChargeSeeder::class,
+        ]);
+
+        // Finalmente crear usuarios administradores de prueba
         $superAdmin = User::query()->firstOrCreate([
             'email' => 'superadmin@loteofacil.cl',
         ], [

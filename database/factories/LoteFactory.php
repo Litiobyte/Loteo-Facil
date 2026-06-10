@@ -18,12 +18,13 @@ class LoteFactory extends Factory
      */
     public function definition(): array
     {
-        $metrosCuadrados = fake()->numberBetween(1000, 500000);
+        $hectareas = fake()->randomElement([1, 3, 5, 6]);
+        $metrosCuadrados = $hectareas * 10000;
 
         return [
-            'codigo' => strtoupper(fake()->bothify('LT-####')),
+            'codigo' => strtoupper(fake()->unique()->bothify('LT-####')),
             'estado' => fake()->randomElement(['disponible', 'vendido', 'reservado']),
-            'hectareas' => $metrosCuadrados / 10000,
+            'hectareas' => $hectareas,
             'metros_cuadrados' => $metrosCuadrados,
             'etapa_id' => Etapa::query()->inRandomOrder()->value('id'),
             'valor_lote' => fake()->numberBetween(5_000_000, 120_000_000),
