@@ -5,12 +5,12 @@ namespace Tests\Feature;
 use App\Domain\Accounting\Enums\AccountingPeriodStatus;
 use App\Domain\Accounting\Services\MonthlyClosingService;
 use App\Domain\Charges\Enums\ChargeStatus;
-use App\Domain\Payments\Enums\PaymentStatus;
-use App\Domain\Payments\Services\PaymentApplicationService;
+use App\Domain\Collections\Enums\CollectionStatus;
+use App\Domain\Collections\Services\CollectionApplicationService;
 use App\Models\AccountingPeriod;
+use App\Models\Collection;
+use App\Models\CollectionAllocation;
 use App\Models\PartnerCharge;
-use App\Models\Payment;
-use App\Models\PaymentAllocation;
 use App\Models\Propietario;
 use App\Models\User;
 use DomainException;
@@ -54,13 +54,13 @@ class MonthlyClosingServiceTest extends TestCase
             'updated_at' => $targetDate,
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 60000,
             'applied_amount' => 0,
             'unapplied_amount' => 60000,
-            'payment_date' => $targetDate->toDateString(),
-            'status' => PaymentStatus::PendingApplication,
+            'collection_date' => $targetDate->toDateString(),
+            'status' => CollectionStatus::PendingApplication,
             'created_by' => $this->user->id,
         ]);
 
@@ -72,7 +72,7 @@ class MonthlyClosingServiceTest extends TestCase
         $this->assertMatchesRegularExpression('/^CIERRE-\d{6}-\d{4}$/', (string) $closed->close_folio);
         $this->assertNotNull($closed->snapshot);
         $this->assertEquals(120000.0, (float) $closed->snapshot->total_charges);
-        $this->assertEquals(60000.0, (float) $closed->snapshot->total_payments);
+        $this->assertEquals(60000.0, (float) $closed->snapshot->total_collections);
     }
 
     /**
@@ -93,17 +93,17 @@ class MonthlyClosingServiceTest extends TestCase
             'updated_at' => $previousMonth,
         ]);
 
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100000,
             'applied_amount' => 0,
             'unapplied_amount' => 100000,
-            'payment_date' => $currentMonth->toDateString(),
+            'collection_date' => $currentMonth->toDateString(),
             'created_by' => $this->user->id,
         ]);
 
         $this->actingAs($this->user);
-        app(PaymentApplicationService::class)->applyPaymentManually($payment, [
+        app(CollectionApplicationService::class)->applyCollectionManually($payment, [
             ['charge_id' => $charge->id, 'amount' => 100000],
         ]);
 
@@ -111,7 +111,7 @@ class MonthlyClosingServiceTest extends TestCase
 
         $this->assertNotNull($closedCurrent->snapshot);
         $this->assertEquals(0.0, (float) $closedCurrent->snapshot->total_charges);
-        $this->assertEquals(100000.0, (float) $closedCurrent->snapshot->total_payments);
+        $this->assertEquals(100000.0, (float) $closedCurrent->snapshot->total_collections);
         $this->assertEquals(100000.0, (float) $closedCurrent->snapshot->total_allocations);
     }
 
@@ -179,19 +179,19 @@ class MonthlyClosingServiceTest extends TestCase
             'updated_at' => $targetDate,
         ]);
 
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 5000,
             'applied_amount' => 0,
             'unapplied_amount' => 5000,
-            'payment_date' => $targetDate->toDateString(),
+            'collection_date' => $targetDate->toDateString(),
             'created_by' => $this->user->id,
         ]);
 
         $this->actingAs($this->user);
-        $allocation = app(PaymentApplicationService::class)->applyPaymentAutomatically($payment)->first();
+        $allocation = app(CollectionApplicationService::class)->applyCollectionAutomatically($payment)->first();
         $this->assertNotNull($allocation);
-        $this->assertSame(1, PaymentAllocation::query()->count());
+        $this->assertSame(1, CollectionAllocation::query()->count());
 
         $period = $this->service->closePeriod((int) $targetDate->format('Y'), (int) $targetDate->format('m'), $this->user->id);
         $response = $this->service->exportClosedPeriodCsv($period);
@@ -203,7 +203,7 @@ class MonthlyClosingServiceTest extends TestCase
         $this->assertStringContainsString('Folio,Periodo,"Tipo movimiento"', $content);
         $this->assertStringContainsString((string) $period->close_folio, $content);
         $this->assertStringContainsString('Cobro emitido', $content);
-        $this->assertStringContainsString('Pago recibido', $content);
+        $this->assertStringContainsString('Recaudacion recibido', $content);
     }
 
     /**
@@ -218,14 +218,14 @@ class MonthlyClosingServiceTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('período contable cerrado');
 
-        Payment::query()->create([
+        Collection::query()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 15000,
             'applied_amount' => 0,
             'unapplied_amount' => 15000,
-            'payment_date' => $closedDate->toDateString(),
-            'payment_method' => 'transferencia',
-            'status' => PaymentStatus::PendingApplication,
+            'collection_date' => $closedDate->toDateString(),
+            'collection_method' => 'transferencia',
+            'status' => CollectionStatus::PendingApplication,
             'created_by' => $this->user->id,
         ]);
     }

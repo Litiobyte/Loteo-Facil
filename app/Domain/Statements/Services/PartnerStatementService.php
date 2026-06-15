@@ -3,12 +3,12 @@
 namespace App\Domain\Statements\Services;
 
 use App\Domain\Balances\Services\PartnerBalanceService;
+use App\Models\Collection as CollectionModel;
+use App\Models\CollectionAllocation;
 use App\Models\PartnerCharge;
-use App\Models\Payment;
-use App\Models\PaymentAllocation;
 use App\Models\Propietario;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 
 class PartnerStatementService
 {
@@ -21,12 +21,12 @@ class PartnerStatementService
      *
      * @return array{
      *     owner: array,
-     *     lots: Collection,
+     *     lots: SupportCollection,
      *     summary: array,
-     *     charges: Collection,
-     *     payments: Collection,
-     *     allocations: Collection,
-     *     timeline: Collection
+     *     charges: SupportCollection,
+     *     collections: SupportCollection,
+     *     allocations: SupportCollection,
+     *     timeline: SupportCollection
      * }
      */
     public function generateStatement(
@@ -39,7 +39,7 @@ class PartnerStatementService
             'lots' => $this->getLotsInfo($propietario),
             'summary' => $this->balanceService->getBalanceSummary($propietario),
             'charges' => $this->getChargesDetail($propietario, $from, $to),
-            'payments' => $this->getPaymentsDetail($propietario, $from, $to),
+            'collections' => $this->getCollectionsDetail($propietario, $from, $to),
             'allocations' => $this->getAllocationsDetail($propietario, $from, $to),
             'timeline' => $this->getMovementTimeline($propietario, $from, $to),
         ];
@@ -48,13 +48,13 @@ class PartnerStatementService
     /**
      * Get detailed charge information.
      *
-     * @return Collection<int, PartnerCharge>
+     * @return SupportCollection<int, PartnerCharge>
      */
     public function getChargesDetail(
         Propietario $propietario,
         ?Carbon $from = null,
         ?Carbon $to = null
-    ): Collection {
+    ): SupportCollection {
         $query = PartnerCharge::query()
             ->with(['expense.category', 'allocations'])
             ->where('propietario_id', $propietario->id)
@@ -75,25 +75,25 @@ class PartnerStatementService
     /**
      * Get detailed payment information.
      *
-     * @return Collection<int, Payment>
+     * @return SupportCollection<int, CollectionModel>
      */
-    public function getPaymentsDetail(
+    public function getCollectionsDetail(
         Propietario $propietario,
         ?Carbon $from = null,
         ?Carbon $to = null
-    ): Collection {
-        $query = Payment::query()
+    ): SupportCollection {
+        $query = CollectionModel::query()
             ->with('allocations.charge')
             ->where('propietario_id', $propietario->id)
-            ->orderBy('payment_date', 'desc')
+            ->orderBy('collection_date', 'desc')
             ->orderBy('created_at', 'desc');
 
         if ($from) {
-            $query->whereDate('payment_date', '>=', $from);
+            $query->whereDate('collection_date', '>=', $from);
         }
 
         if ($to) {
-            $query->whereDate('payment_date', '<=', $to);
+            $query->whereDate('collection_date', '<=', $to);
         }
 
         return $query->get();
@@ -102,14 +102,14 @@ class PartnerStatementService
     /**
      * Get detailed allocation information.
      *
-     * @return Collection<int, PaymentAllocation>
+     * @return SupportCollection<int, CollectionAllocation>
      */
     public function getAllocationsDetail(
         Propietario $propietario,
         ?Carbon $from = null,
         ?Carbon $to = null
-    ): Collection {
-        $query = PaymentAllocation::query()
+    ): SupportCollection {
+        $query = CollectionAllocation::query()
             ->with(['payment', 'charge.expense.category'])
             ->whereHas('payment', fn ($q) => $q->where('propietario_id', $propietario->id))
             ->orderBy('allocated_at', 'desc');
@@ -128,7 +128,7 @@ class PartnerStatementService
     /**
      * Get chronological timeline of all financial movements.
      *
-     * @return Collection<int, array{
+     * @return SupportCollection<int, array{
      *     date: Carbon,
      *     type: string,
      *     description: string,
@@ -142,8 +142,8 @@ class PartnerStatementService
         Propietario $propietario,
         ?Carbon $from = null,
         ?Carbon $to = null
-    ): Collection {
-        $movements = new Collection;
+    ): SupportCollection {
+        $movements = new SupportCollection;
 
         // Add charges
         $charges = $this->getChargesDetail($propietario, $from, $to);
@@ -160,17 +160,17 @@ class PartnerStatementService
             ]);
         }
 
-        // Add payments
-        $payments = $this->getPaymentsDetail($propietario, $from, $to);
-        foreach ($payments as $payment) {
+        // Add collections
+        $collections = $this->getCollectionsDetail($propietario, $from, $to);
+        foreach ($collections as $payment) {
             $movements->push([
-                'date' => $payment->payment_date,
+                'date' => $payment->collection_date,
                 'type' => 'payment',
-                'description' => "Pago {$payment->payment_method->getLabel()} - Ref: ".($payment->reference ?? 'N/A'),
+                'description' => "Recaudacion {$payment->collection_method->getLabel()} - Ref: ".($payment->reference ?? 'N/A'),
                 'amount' => (float) $payment->amount,
                 'balance_impact' => -(float) $payment->amount, // Reduces debt
                 'related_id' => $payment->id,
-                'related_type' => 'Payment',
+                'related_type' => 'Collection',
                 'status' => $payment->status->value,
             ]);
         }
@@ -183,13 +183,13 @@ class PartnerStatementService
                 'type' => 'allocation',
                 'description' => sprintf(
                     'Aplicación de pago #%d a cobro #%d',
-                    $allocation->payment_id,
+                    $allocation->collection_id,
                     $allocation->partner_charge_id
                 ),
                 'amount' => (float) $allocation->amount,
                 'balance_impact' => 0, // Neutral, just application
                 'related_id' => $allocation->id,
-                'related_type' => 'PaymentAllocation',
+                'related_type' => 'CollectionAllocation',
                 'status' => 'applied',
             ]);
         }
@@ -223,14 +223,14 @@ class PartnerStatementService
     /**
      * Get lots information with hectares.
      *
-     * @return Collection<int, array{
+     * @return SupportCollection<int, array{
      *     lot_code: string,
      *     square_meters: float,
      *     hectares: float,
      *     status: string
      * }>
      */
-    private function getLotsInfo(Propietario $propietario): Collection
+    private function getLotsInfo(Propietario $propietario): SupportCollection
     {
         return $propietario->lotes()
             ->wherePivot('status', 'active')

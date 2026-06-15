@@ -2,21 +2,24 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Admin\Widgets\AdminCollectionsSummaryWidget;
+use App\Filament\Admin\Widgets\CashOnHandStatWidget;
 use App\Filament\Admin\Widgets\CollectionsTrendChartWidget;
-use App\Filament\Admin\Widgets\OverdueAgingChartWidget;
-use App\Filament\Admin\Widgets\PaymentApplicationFunnelChartWidget;
+use App\Filament\Admin\Widgets\DelinquentOwnersStatWidget;
+use App\Filament\Admin\Widgets\LatestCollectionsTableWidget;
+use App\Filament\Admin\Widgets\LotsSummaryStatWidget;
+use App\Filament\Admin\Widgets\OverduePortfolioStatWidget;
+use App\Filament\Admin\Widgets\OwnersOnTimeStatWidget;
+use App\Filament\Admin\Widgets\PendingPortfolioStatWidget;
 use App\Filament\Admin\Widgets\TopDelinquentOwnersWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -52,13 +55,22 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
-                AdminCollectionsSummaryWidget::class,
+                OverduePortfolioStatWidget::class,
+                OwnersOnTimeStatWidget::class,
+                DelinquentOwnersStatWidget::class,
+                CashOnHandStatWidget::class,
+                PendingPortfolioStatWidget::class,
+                LotsSummaryStatWidget::class,
                 CollectionsTrendChartWidget::class,
-                OverdueAgingChartWidget::class,
-                PaymentApplicationFunnelChartWidget::class,
                 TopDelinquentOwnersWidget::class,
-                AccountWidget::class,
-                FilamentInfoWidget::class,
+                LatestCollectionsTableWidget::class,
+            ])
+            ->sidebarWidth('15rem')
+            ->sidebarCollapsibleOnDesktop()
+            ->collapsedSidebarWidth('5rem')
+            ->navigationGroups([
+                NavigationGroup::make('Gastos Comunes'),
+                NavigationGroup::make('Finanzas'),
             ])
             ->middleware([
                 EncryptCookies::class,

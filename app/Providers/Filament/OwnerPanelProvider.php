@@ -3,7 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Owner\Widgets\FinancialSummaryWidget;
-use App\Filament\Owner\Widgets\NextPaymentEstimateWidget;
+use App\Filament\Owner\Widgets\NextCollectionEstimateWidget;
 use App\Filament\Owner\Widgets\OverdueAlertsWidget;
 use App\Filament\Owner\Widgets\WelcomeWidget;
 use Filament\Http\Middleware\Authenticate;
@@ -51,7 +51,7 @@ class OwnerPanelProvider extends PanelProvider
                 WelcomeWidget::class,
                 OverdueAlertsWidget::class,
                 FinancialSummaryWidget::class,
-                NextPaymentEstimateWidget::class,
+                NextCollectionEstimateWidget::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make('Finanzas')

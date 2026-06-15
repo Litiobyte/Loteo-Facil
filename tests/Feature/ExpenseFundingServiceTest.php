@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Domain\Expenses\Enums\ExpenseStatus;
 use App\Domain\Expenses\Services\ExpenseFundingService;
+use App\Models\Collection;
 use App\Models\Expense;
 use App\Models\ExpenseFundingPayment;
-use App\Models\Payment;
 use App\Models\Propietario;
 use App\Models\User;
 use DomainException;
@@ -22,7 +22,7 @@ class ExpenseFundingServiceTest extends TestCase
     {
         $owner = Propietario::factory()->create();
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $owner->id,
             'amount' => $amount,
             'applied_amount' => 0,

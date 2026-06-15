@@ -38,7 +38,7 @@ class EstadoDeCuenta extends Page implements HasTable
 
     public string $quickFilter = 'all';
 
-    /** @var array<int, array{month: string, charges: float, payments: float, balance: float, trend: string}> */
+    /** @var array<int, array{month: string, charges: float, collections: float, balance: float, trend: string}> */
     public array $monthComparison = [];
 
     public function mount(): void
@@ -121,7 +121,7 @@ class EstadoDeCuenta extends Page implements HasTable
 
         $resumen = [
             'cobrado' => (float) $summary['total_charges'],
-            'pagado' => (float) $summary['total_payments'],
+            'pagado' => (float) $summary['total_collections'],
             'aplicado' => (float) $summary['total_applied'],
             'pendiente' => (float) $summary['pending_balance'],
             'disponible' => (float) $summary['credit_balance'],
@@ -234,7 +234,7 @@ class EstadoDeCuenta extends Page implements HasTable
     }
 
     /**
-     * @return array<int, array{month: string, charges: float, payments: float, balance: float, trend: string}>
+     * @return array<int, array{month: string, charges: float, collections: float, balance: float, trend: string}>
      */
     protected function calculateMonthComparison(): array
     {
@@ -253,8 +253,8 @@ class EstadoDeCuenta extends Page implements HasTable
 
             $statement = app(PartnerStatementService::class)->generateStatement($propietario, $monthStart, $monthEnd);
             $charges = round((float) $statement['charges']->sum('amount'), 2);
-            $payments = round((float) $statement['payments']->sum('amount'), 2);
-            $balance = round($charges - $payments, 2);
+            $collections = round((float) $statement['collections']->sum('amount'), 2);
+            $balance = round($charges - $collections, 2);
 
             $trend = 'neutral';
 
@@ -269,7 +269,7 @@ class EstadoDeCuenta extends Page implements HasTable
             $comparison[] = [
                 'month' => $this->formatMonthLabel($monthStart),
                 'charges' => $charges,
-                'payments' => $payments,
+                'collections' => $collections,
                 'balance' => $balance,
                 'trend' => $trend,
             ];

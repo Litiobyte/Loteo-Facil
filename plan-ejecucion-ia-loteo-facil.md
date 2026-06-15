@@ -513,7 +513,7 @@ Preparar el sistema para la primera sociedad de 54 socios.
 
 ---
 
-## Fase 10 - Despliegue
+## Fase 10 - Despliegue 
 
 ### Objetivo
 

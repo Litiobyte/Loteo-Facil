@@ -21,7 +21,7 @@ class AccountingPeriodSnapshotFactory extends Factory
         return [
             'accounting_period_id' => AccountingPeriod::factory(),
             'total_charges' => fake()->randomFloat(2, 0, 5000000),
-            'total_payments' => fake()->randomFloat(2, 0, 5000000),
+            'total_collections' => fake()->randomFloat(2, 0, 5000000),
             'total_allocations' => fake()->randomFloat(2, 0, 5000000),
             'pending_balance' => fake()->randomFloat(2, 0, 5000000),
             'credit_balance' => fake()->randomFloat(2, 0, 5000000),

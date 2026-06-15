@@ -7,12 +7,12 @@ use App\Models\Expense;
 class ExpenseFundingService
 {
     public function __construct(
-        private readonly ExpenseFundingPaymentService $fundingPaymentService
+        private readonly ExpenseFundingPaymentService $fundingCollectionService
     ) {}
 
     public function applyFunding(Expense $expense, float $amount, bool $allowNegativeCash = false): Expense
     {
-        $this->fundingPaymentService->register(
+        $this->fundingCollectionService->register(
             expense: $expense,
             amount: $amount,
             paymentDate: now()->toDateString(),

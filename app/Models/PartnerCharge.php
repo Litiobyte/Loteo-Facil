@@ -102,14 +102,14 @@ class PartnerCharge extends Model
 
             if ($closingService->isDateInClosedPeriod($original->created_at)) {
                 $dirty = array_keys($charge->getDirty());
-                $allowedForPaymentApplication = [
+                $allowedForCollectionApplication = [
                     'paid_amount',
                     'remaining_amount',
                     'status',
                     'updated_at',
                 ];
 
-                $blockedAttributes = array_diff($dirty, $allowedForPaymentApplication);
+                $blockedAttributes = array_diff($dirty, $allowedForCollectionApplication);
 
                 if ($blockedAttributes !== []) {
                     throw new DomainException('No se pueden editar campos estructurales de un cobro en período cerrado.');
@@ -120,14 +120,14 @@ class PartnerCharge extends Model
                 $dirty = array_keys($charge->getDirty());
 
                 // Campos que SÍ pueden actualizarse al aplicar pagos
-                $allowedForPaymentApplication = [
+                $allowedForCollectionApplication = [
                     'paid_amount',
                     'remaining_amount',
                     'status',
                     'updated_at',
                 ];
 
-                $blockedAttributes = array_diff($dirty, $allowedForPaymentApplication);
+                $blockedAttributes = array_diff($dirty, $allowedForCollectionApplication);
 
                 if ($blockedAttributes !== []) {
                     throw new DomainException('No se puede editar un cobro de un gasto ya distribuido o cancelado.');
@@ -155,7 +155,7 @@ class PartnerCharge extends Model
 
     public function allocations(): HasMany
     {
-        return $this->hasMany(PaymentAllocation::class);
+        return $this->hasMany(CollectionAllocation::class);
     }
 
     #[Scope]

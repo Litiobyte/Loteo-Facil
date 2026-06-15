@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Domain\Expenses\Enums\ExpenseStatus;
 use App\Domain\Expenses\Services\ExpenseFundingPaymentService;
+use App\Models\Collection;
 use App\Models\Expense;
 use App\Models\ExpenseFundingPayment;
-use App\Models\Payment;
 use App\Models\Propietario;
 use App\Models\User;
 use DomainException;
@@ -22,7 +22,7 @@ class ExpenseFundingPaymentServiceTest extends TestCase
     {
         $owner = Propietario::factory()->create();
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $owner->id,
             'amount' => $amount,
             'applied_amount' => 0,
@@ -44,7 +44,7 @@ class ExpenseFundingPaymentServiceTest extends TestCase
             expense: $expense,
             amount: 50000,
             paymentDate: now()->toDateString(),
-            notes: 'Pago parcial',
+            notes: 'Recaudacion parcial',
         );
 
         $this->assertModelExists($payment);
@@ -97,7 +97,7 @@ class ExpenseFundingPaymentServiceTest extends TestCase
             expense: $expense,
             amount: 90000,
             paymentDate: now()->toDateString(),
-            notes: 'Pago total',
+            notes: 'Recaudacion total',
         );
 
         $this->assertSame(ExpenseStatus::Paid, $expense->fresh()->status);

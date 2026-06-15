@@ -117,7 +117,7 @@
                         <tr>
                             <th class="px-3 py-2 text-left text-sm">Mes</th>
                             <th class="px-3 py-2 text-left text-sm">Cobros</th>
-                            <th class="px-3 py-2 text-left text-sm">Pagos</th>
+                            <th class="px-3 py-2 text-left text-sm">Recaudaciones</th>
                             <th class="px-3 py-2 text-left text-sm">Balance</th>
                             <th class="px-3 py-2 text-left text-sm">Tendencia</th>
                         </tr>
@@ -127,7 +127,7 @@
                             <tr class="border-t dark:border-gray-700">
                                 <td class="px-3 py-2 text-sm">{{ $month['month'] }}</td>
                                 <td class="px-3 py-2 text-sm">${{ number_format((float) $month['charges'], 2) }}</td>
-                                <td class="px-3 py-2 text-sm">${{ number_format((float) $month['payments'], 2) }}</td>
+                                <td class="px-3 py-2 text-sm">${{ number_format((float) $month['collections'], 2) }}</td>
                                 <td class="px-3 py-2 text-sm {{ (float) $month['balance'] < 0 ? 'text-danger-600 dark:text-danger-400' : 'text-success-600 dark:text-success-400' }}">
                                     ${{ number_format((float) $month['balance'], 2) }}
                                 </td>

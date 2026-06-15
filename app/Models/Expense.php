@@ -192,7 +192,7 @@ class Expense extends Model
         return $this->hasMany(PartnerCharge::class);
     }
 
-    public function fundingPayments(): HasMany
+    public function fundingCollections(): HasMany
     {
         return $this->hasMany(ExpenseFundingPayment::class);
     }

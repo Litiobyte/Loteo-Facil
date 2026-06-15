@@ -55,14 +55,14 @@ class ViewCobro extends ViewRecord
                         TextEntry::make('amount')->label('Mi cobro calculado')->money('CLP', locale: 'es_CL'),
                         TextEntry::make('calculation_notes')->label('Notas de cálculo')->columnSpanFull()->placeholder('-'),
                     ]),
-                Section::make('Historial de Pagos')
+                Section::make('Historial de Recaudaciones')
                     ->hidden(fn (PartnerCharge $record): bool => $record->allocations->isEmpty())
                     ->schema([
                         RepeatableEntry::make('allocations')
                             ->label('Aplicaciones')
                             ->schema([
-                                TextEntry::make('payment.payment_date')->label('Fecha pago')->date('d/m/Y'),
-                                TextEntry::make('payment.payment_method')->label('Método')->badge()->formatStateUsing(fn ($state): string => $state?->getLabel() ?? '-'),
+                                TextEntry::make('payment.collection_date')->label('Fecha pago')->date('d/m/Y'),
+                                TextEntry::make('payment.collection_method')->label('Método')->badge()->formatStateUsing(fn ($state): string => $state?->getLabel() ?? '-'),
                                 TextEntry::make('amount')->label('Monto aplicado')->money('CLP', locale: 'es_CL'),
                                 TextEntry::make('allocated_at')->label('Fecha aplicación')->dateTime('d/m/Y H:i'),
                             ])

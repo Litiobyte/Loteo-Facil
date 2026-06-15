@@ -29,9 +29,9 @@ class ExpenseFactory extends Factory
         return [
             'expense_category_id' => ExpenseCategory::factory(),
             'title' => fake()->randomElement([
-                'Pago de asesoría contable mensual',
+                'Recaudacion de asesoría contable mensual',
                 'Inscripción de documentos en conservador',
-                'Pago de contribuciones trimestrales',
+                'Recaudacion de contribuciones trimestrales',
                 'Revisión legal de escrituras',
                 'Gastos administrativos del proyecto',
                 'Mantención de caminos interiores',

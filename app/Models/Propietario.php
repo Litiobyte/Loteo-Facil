@@ -85,9 +85,9 @@ class Propietario extends Model
         return $this->hasMany(PartnerCharge::class);
     }
 
-    public function payments(): HasMany
+    public function collections(): HasMany
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Collection::class);
     }
 
     public function chargesPending(): HasMany

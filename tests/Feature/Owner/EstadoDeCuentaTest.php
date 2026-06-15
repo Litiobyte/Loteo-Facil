@@ -4,8 +4,8 @@ namespace Tests\Feature\Owner;
 
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Filament\Owner\Pages\EstadoDeCuenta;
+use App\Models\Collection;
 use App\Models\PartnerCharge;
-use App\Models\Payment;
 use App\Models\Propietario;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,7 +39,7 @@ class EstadoDeCuentaTest extends TestCase
     {
         [$user, $owner] = $this->createOwner();
         PartnerCharge::factory()->create(['propietario_id' => $owner->id]);
-        Payment::factory()->create(['propietario_id' => $owner->id]);
+        Collection::factory()->create(['propietario_id' => $owner->id]);
 
         $this->actingAs($user);
 

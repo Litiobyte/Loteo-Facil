@@ -4,16 +4,16 @@ namespace App\Domain\Accounting\Services;
 
 use App\Domain\Accounting\Enums\AccountingPeriodStatus;
 use App\Domain\Charges\Enums\ChargeStatus;
-use App\Domain\Payments\Enums\PaymentStatus;
+use App\Domain\Collections\Enums\CollectionStatus;
 use App\Models\AccountingPeriod;
 use App\Models\AccountingPeriodSnapshot;
+use App\Models\Collection;
+use App\Models\CollectionAllocation;
 use App\Models\PartnerCharge;
-use App\Models\Payment;
-use App\Models\PaymentAllocation;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -175,14 +175,14 @@ class MonthlyClosingService
             ->selectRaw('COALESCE(SUM(remaining_amount), 0) as total_remaining')
             ->first();
 
-        $payments = Payment::query()
-            ->where('status', '!=', PaymentStatus::Cancelled->value)
+        $collections = Collection::query()
+            ->where('status', '!=', CollectionStatus::Cancelled->value)
             ->selectRaw('COALESCE(SUM(amount), 0) as total_amount')
             ->selectRaw('COALESCE(SUM(applied_amount), 0) as total_applied')
             ->selectRaw('COALESCE(SUM(unapplied_amount), 0) as total_unapplied')
             ->first();
 
-        $totalAllocated = (float) PaymentAllocation::query()->sum('amount');
+        $totalAllocated = (float) CollectionAllocation::query()->sum('amount');
 
         $chargesTotal = round((float) ($charges?->total_amount ?? 0), 2);
         $chargesExplained = round((float) ($charges?->total_paid ?? 0) + (float) ($charges?->total_remaining ?? 0), 2);
@@ -191,17 +191,17 @@ class MonthlyClosingService
             $errors[] = 'Inconsistencia global en cobros: amount != paid + remaining.';
         }
 
-        $paymentsTotal = round((float) ($payments?->total_amount ?? 0), 2);
-        $paymentsExplained = round((float) ($payments?->total_applied ?? 0) + (float) ($payments?->total_unapplied ?? 0), 2);
+        $collectionsTotal = round((float) ($collections?->total_amount ?? 0), 2);
+        $collectionsExplained = round((float) ($collections?->total_applied ?? 0) + (float) ($collections?->total_unapplied ?? 0), 2);
 
-        if (abs($paymentsTotal - $paymentsExplained) > 0.01) {
+        if (abs($collectionsTotal - $collectionsExplained) > 0.01) {
             $errors[] = 'Inconsistencia global en pagos: amount != applied + unapplied.';
         }
 
-        $paymentsApplied = round((float) ($payments?->total_applied ?? 0), 2);
+        $collectionsApplied = round((float) ($collections?->total_applied ?? 0), 2);
         $allocated = round($totalAllocated, 2);
 
-        if (abs($paymentsApplied - $allocated) > 0.01) {
+        if (abs($collectionsApplied - $allocated) > 0.01) {
             $errors[] = 'Inconsistencia global entre pagos aplicados y asignaciones registradas.';
         }
 
@@ -250,12 +250,12 @@ class MonthlyClosingService
             ->whereBetween('created_at', [$start, $end])
             ->sum('amount');
 
-        $totalPayments = (float) Payment::query()
-            ->where('status', '!=', PaymentStatus::Cancelled->value)
-            ->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()])
+        $totalCollections = (float) Collection::query()
+            ->where('status', '!=', CollectionStatus::Cancelled->value)
+            ->whereBetween('collection_date', [$start->toDateString(), $end->toDateString()])
             ->sum('amount');
 
-        $totalAllocations = (float) PaymentAllocation::query()
+        $totalAllocations = (float) CollectionAllocation::query()
             ->whereBetween('allocated_at', [$start, $end])
             ->sum('amount');
 
@@ -263,15 +263,15 @@ class MonthlyClosingService
             ->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Partial->value])
             ->sum('remaining_amount');
 
-        $creditBalance = (float) Payment::query()
-            ->whereIn('status', [PaymentStatus::PendingApplication->value, PaymentStatus::PartiallyApplied->value])
+        $creditBalance = (float) Collection::query()
+            ->whereIn('status', [CollectionStatus::PendingApplication->value, CollectionStatus::PartiallyApplied->value])
             ->sum('unapplied_amount');
 
         $aging = $this->calculateAgingBuckets();
 
         return [
             'total_charges' => round($totalCharges, 2),
-            'total_payments' => round($totalPayments, 2),
+            'total_collections' => round($totalCollections, 2),
             'total_allocations' => round($totalAllocations, 2),
             'pending_balance' => round($pendingBalance, 2),
             'credit_balance' => round($creditBalance, 2),
@@ -331,9 +331,9 @@ class MonthlyClosingService
     }
 
     /**
-     * @return Collection<int, array{movement_type: string, movement_date: string, owner_name: string, reference: string, debit: float, credit: float, running_balance: float, status: string}>
+     * @return SupportCollection<int, array{movement_type: string, movement_date: string, owner_name: string, reference: string, debit: float, credit: float, running_balance: float, status: string}>
      */
-    private function buildExportRows(AccountingPeriod $period): Collection
+    private function buildExportRows(AccountingPeriod $period): SupportCollection
     {
         $start = Carbon::parse($period->period_start)->startOfDay();
         $end = Carbon::parse($period->period_end)->endOfDay();
@@ -358,26 +358,26 @@ class MonthlyClosingService
             ]);
         }
 
-        $payments = Payment::query()
+        $collections = Collection::query()
             ->with('propietario')
-            ->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()])
-            ->where('status', '!=', PaymentStatus::Cancelled->value)
+            ->whereBetween('collection_date', [$start->toDateString(), $end->toDateString()])
+            ->where('status', '!=', CollectionStatus::Cancelled->value)
             ->get();
 
-        foreach ($payments as $payment) {
+        foreach ($collections as $payment) {
             $rows->push([
-                'movement_type' => 'Pago recibido',
-                'movement_date' => $payment->payment_date?->format('Y-m-d') ?? '-',
+                'movement_type' => 'Recaudacion recibido',
+                'movement_date' => $payment->collection_date?->format('Y-m-d') ?? '-',
                 'owner_name' => $payment->propietario?->nombre_completo ?? '-',
-                'reference' => 'Pago #'.$payment->id.($payment->reference ? ' - '.$payment->reference : ''),
+                'reference' => 'Recaudacion #'.$payment->id.($payment->reference ? ' - '.$payment->reference : ''),
                 'debit' => 0.0,
                 'credit' => round((float) $payment->amount, 2),
                 'status' => $payment->status->value,
-                'sort_key' => $payment->payment_date?->timestamp ?? 0,
+                'sort_key' => $payment->collection_date?->timestamp ?? 0,
             ]);
         }
 
-        $allocations = PaymentAllocation::query()
+        $allocations = CollectionAllocation::query()
             ->with(['payment.propietario', 'charge'])
             ->whereBetween('allocated_at', [$start, $end])
             ->get();
@@ -387,7 +387,7 @@ class MonthlyClosingService
                 'movement_type' => 'Aplicación de pago',
                 'movement_date' => $allocation->allocated_at?->format('Y-m-d H:i:s') ?? '-',
                 'owner_name' => $allocation->payment?->propietario?->nombre_completo ?? '-',
-                'reference' => sprintf('Asignación #%d (Pago #%d -> Cobro #%d)', $allocation->id, $allocation->payment_id, $allocation->partner_charge_id),
+                'reference' => sprintf('Asignación #%d (Recaudacion #%d -> Cobro #%d)', $allocation->id, $allocation->collection_id, $allocation->partner_charge_id),
                 'debit' => 0.0,
                 'credit' => 0.0,
                 'status' => 'applied',

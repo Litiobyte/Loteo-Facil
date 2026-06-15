@@ -2,8 +2,8 @@
 
 namespace App\Domain\Balances\Services;
 
+use App\Models\Collection;
 use App\Models\PartnerCharge;
-use App\Models\Payment;
 use App\Models\Propietario;
 
 class PartnerBalanceService
@@ -26,7 +26,7 @@ class PartnerBalanceService
      */
     public function getCreditBalance(Propietario $propietario): float
     {
-        $credit = Payment::query()
+        $credit = Collection::query()
             ->where('propietario_id', $propietario->id)
             ->whereIn('status', ['pending_application', 'partially_applied'])
             ->sum('unapplied_amount');
@@ -47,11 +47,11 @@ class PartnerBalanceService
     }
 
     /**
-     * Get total payments amount for propietario.
+     * Get total collections amount for propietario.
      */
-    public function getTotalPayments(Propietario $propietario): float
+    public function getTotalCollections(Propietario $propietario): float
     {
-        $total = Payment::query()
+        $total = Collection::query()
             ->where('propietario_id', $propietario->id)
             ->whereNotIn('status', ['cancelled'])
             ->sum('amount');
@@ -64,7 +64,7 @@ class PartnerBalanceService
      */
     public function getTotalApplied(Propietario $propietario): float
     {
-        $total = Payment::query()
+        $total = Collection::query()
             ->where('propietario_id', $propietario->id)
             ->whereNotIn('status', ['cancelled'])
             ->sum('applied_amount');
@@ -77,7 +77,7 @@ class PartnerBalanceService
      *
      * @return array{
      *     total_charges: float,
-     *     total_payments: float,
+     *     total_collections: float,
      *     total_applied: float,
      *     pending_balance: float,
      *     credit_balance: float,
@@ -88,7 +88,7 @@ class PartnerBalanceService
     public function getBalanceSummary(Propietario $propietario): array
     {
         $totalCharges = $this->getTotalCharges($propietario);
-        $totalPayments = $this->getTotalPayments($propietario);
+        $totalCollections = $this->getTotalCollections($propietario);
         $totalApplied = $this->getTotalApplied($propietario);
         $pendingBalance = $this->getPendingBalance($propietario);
         $creditBalance = $this->getCreditBalance($propietario);
@@ -99,7 +99,7 @@ class PartnerBalanceService
 
         return [
             'total_charges' => $totalCharges,
-            'total_payments' => $totalPayments,
+            'total_collections' => $totalCollections,
             'total_applied' => $totalApplied,
             'pending_balance' => $pendingBalance,
             'credit_balance' => $creditBalance,
@@ -138,32 +138,32 @@ class PartnerBalanceService
         }
 
         // Rule 2: Sum of payment amounts = sum of applied_amount + sum of unapplied_amount
-        $totalPayments = $this->getTotalPayments($propietario);
+        $totalCollections = $this->getTotalCollections($propietario);
         $totalApplied = $this->getTotalApplied($propietario);
-        $totalUnapplied = Payment::query()
+        $totalUnapplied = Collection::query()
             ->where('propietario_id', $propietario->id)
             ->whereNotIn('status', ['cancelled'])
             ->sum('unapplied_amount');
 
-        $calculatedPaymentTotal = round((float) $totalApplied + (float) $totalUnapplied, 2);
+        $calculatedCollectionTotal = round((float) $totalApplied + (float) $totalUnapplied, 2);
 
-        if (abs($totalPayments - $calculatedPaymentTotal) > 0.01) {
+        if (abs($totalCollections - $calculatedCollectionTotal) > 0.01) {
             $errors[] = sprintf(
                 'Inconsistencia en pagos: total=%s, pero applied+unapplied=%s',
-                $totalPayments,
-                $calculatedPaymentTotal
+                $totalCollections,
+                $calculatedCollectionTotal
             );
         }
 
         // Rule 3: Total applied should equal total paid on charges
         $chargesTotalPaid = round((float) $totalPaid, 2);
-        $paymentsTotalApplied = round((float) $totalApplied, 2);
+        $collectionsTotalApplied = round((float) $totalApplied, 2);
 
-        if (abs($chargesTotalPaid - $paymentsTotalApplied) > 0.01) {
+        if (abs($chargesTotalPaid - $collectionsTotalApplied) > 0.01) {
             $errors[] = sprintf(
                 'Inconsistencia entre cobros pagados (%s) y pagos aplicados (%s)',
                 $chargesTotalPaid,
-                $paymentsTotalApplied
+                $collectionsTotalApplied
             );
         }
 

@@ -4,11 +4,11 @@ namespace Tests\Feature;
 
 use App\Domain\Balances\Services\PartnerBalanceService;
 use App\Domain\Charges\Enums\ChargeStatus;
-use App\Domain\Payments\Services\PaymentApplicationService;
+use App\Domain\Collections\Services\CollectionApplicationService;
+use App\Models\Collection;
 use App\Models\Etapa;
 use App\Models\Lote;
 use App\Models\PartnerCharge;
-use App\Models\Payment;
 use App\Models\Propietario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -69,10 +69,10 @@ class PartnerBalanceServiceTest extends TestCase
         $this->assertEquals(200.00, $pending); // 100 + 100
     }
 
-    public function test_get_credit_balance_sums_unapplied_payments(): void
+    public function test_get_credit_balance_sums_unapplied_collections(): void
     {
         // Arrange
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 200.00,
             'applied_amount' => 150.00,
@@ -80,7 +80,7 @@ class PartnerBalanceServiceTest extends TestCase
             'status' => 'partially_applied',
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
             'applied_amount' => 0,
@@ -88,7 +88,7 @@ class PartnerBalanceServiceTest extends TestCase
             'status' => 'pending_application',
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 80.00,
             'applied_amount' => 80.00,
@@ -123,29 +123,29 @@ class PartnerBalanceServiceTest extends TestCase
         $this->assertEquals(300.00, $total);
     }
 
-    public function test_get_total_payments_excludes_cancelled(): void
+    public function test_get_total_collections_excludes_cancelled(): void
     {
         // Arrange
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
             'status' => 'pending_application',
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 200.00,
             'status' => 'fully_applied',
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 50.00,
             'status' => 'cancelled',
         ]);
 
         // Act
-        $total = $this->service->getTotalPayments($this->propietario);
+        $total = $this->service->getTotalCollections($this->propietario);
 
         // Assert - cancelled not included
         $this->assertEquals(300.00, $total);
@@ -154,13 +154,13 @@ class PartnerBalanceServiceTest extends TestCase
     public function test_get_total_applied_sums_applied_amounts(): void
     {
         // Arrange
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
             'applied_amount' => 80.00,
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 200.00,
             'applied_amount' => 200.00,
@@ -192,7 +192,7 @@ class PartnerBalanceServiceTest extends TestCase
             'status' => ChargeStatus::Partial,
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 200.00,
             'applied_amount' => 150.00,
@@ -204,7 +204,7 @@ class PartnerBalanceServiceTest extends TestCase
 
         // Assert
         $this->assertEquals(300.00, $summary['total_charges']);
-        $this->assertEquals(200.00, $summary['total_payments']);
+        $this->assertEquals(200.00, $summary['total_collections']);
         $this->assertEquals(150.00, $summary['total_applied']);
         $this->assertEquals(150.00, $summary['pending_balance']); // 100 + 50
         $this->assertEquals(50.00, $summary['credit_balance']);
@@ -238,7 +238,7 @@ class PartnerBalanceServiceTest extends TestCase
     public function test_validate_balance_consistency_detects_payment_inconsistency(): void
     {
         // Arrange - manually create inconsistent payment
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
             'applied_amount' => 60.00,
@@ -266,8 +266,8 @@ class PartnerBalanceServiceTest extends TestCase
             'remaining_amount' => 20.00,
         ]);
 
-        // Payment with different applied amount (mismatch)
-        Payment::factory()->create([
+        // Collection with different applied amount (mismatch)
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 150.00,
             'applied_amount' => 100.00, // Doesn't match charge paid_amount
@@ -294,7 +294,7 @@ class PartnerBalanceServiceTest extends TestCase
             'status' => ChargeStatus::Pending,
         ]);
 
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
             'applied_amount' => 0,
@@ -302,8 +302,8 @@ class PartnerBalanceServiceTest extends TestCase
         ]);
 
         // Apply payment properly
-        $applicationService = new PaymentApplicationService;
-        $applicationService->applyPaymentAutomatically($payment);
+        $applicationService = new CollectionApplicationService;
+        $applicationService->applyCollectionAutomatically($payment);
 
         // Act
         $result = $this->service->validateBalanceConsistency($this->propietario);
@@ -324,7 +324,7 @@ class PartnerBalanceServiceTest extends TestCase
             'status' => ChargeStatus::Pending,
         ]);
 
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 200.00,
             'applied_amount' => 0,
@@ -332,8 +332,8 @@ class PartnerBalanceServiceTest extends TestCase
         ]);
 
         // Apply payment to charge
-        $applicationService = new PaymentApplicationService;
-        $applicationService->applyPaymentAutomatically($payment);
+        $applicationService = new CollectionApplicationService;
+        $applicationService->applyCollectionAutomatically($payment);
 
         // Act
         $summary = $this->service->getBalanceSummary($this->propietario);
@@ -355,7 +355,7 @@ class PartnerBalanceServiceTest extends TestCase
             'status' => ChargeStatus::Paid,
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 200.00,
             'applied_amount' => 100.00,

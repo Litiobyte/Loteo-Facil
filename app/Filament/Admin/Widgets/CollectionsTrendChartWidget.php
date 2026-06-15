@@ -2,8 +2,8 @@
 
 namespace App\Filament\Admin\Widgets;
 
+use App\Models\CollectionAllocation;
 use App\Models\PartnerCharge;
-use App\Models\PaymentAllocation;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
 
@@ -14,8 +14,8 @@ class CollectionsTrendChartWidget extends ChartWidget
     protected ?string $heading = 'Cobros vs recuperacion (ultimos 6 meses)';
 
     protected int|string|array $columnSpan = [
-        'md' => 2,
-        'xl' => 2,
+        'md' => 8,
+        'xl' => 8,
     ];
 
     protected ?string $pollingInterval = '60s';
@@ -35,14 +35,14 @@ class CollectionsTrendChartWidget extends ChartWidget
             ->groupBy('month_key')
             ->pluck('total_amount', 'month_key');
 
-        $recoveredByMonth = PaymentAllocation::query()
-            ->join('payments', 'payments.id', '=', 'payment_allocations.payment_id')
-            ->whereBetween('payments.payment_date', [
+        $recoveredByMonth = CollectionAllocation::query()
+            ->join('collections', 'collections.id', '=', 'collection_allocations.collection_id')
+            ->whereBetween('collections.collection_date', [
                 $months[0]['start']->copy()->startOfDay(),
                 $months[5]['end']->copy()->endOfDay(),
             ])
-            ->selectRaw("strftime('%Y-%m', payments.payment_date) as month_key")
-            ->selectRaw('COALESCE(SUM(payment_allocations.amount), 0) as total_amount')
+            ->selectRaw("strftime('%Y-%m', collections.collection_date) as month_key")
+            ->selectRaw('COALESCE(SUM(collection_allocations.amount), 0) as total_amount')
             ->groupBy('month_key')
             ->pluck('total_amount', 'month_key');
 

@@ -16,7 +16,7 @@ class AccountingPeriodSnapshot extends Model
     protected $fillable = [
         'accounting_period_id',
         'total_charges',
-        'total_payments',
+        'total_collections',
         'total_allocations',
         'pending_balance',
         'credit_balance',
@@ -34,7 +34,7 @@ class AccountingPeriodSnapshot extends Model
     {
         return [
             'total_charges' => 'decimal:2',
-            'total_payments' => 'decimal:2',
+            'total_collections' => 'decimal:2',
             'total_allocations' => 'decimal:2',
             'pending_balance' => 'decimal:2',
             'credit_balance' => 'decimal:2',

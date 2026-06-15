@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 use App\Domain\Expenses\Enums\ExpenseStatus;
+use App\Filament\Admin\Resources\AccountingPeriods\AccountingPeriodResource;
+use App\Filament\Admin\Resources\CollectionResource;
 use App\Filament\Admin\Resources\ExpenseCategoryResource;
+use App\Filament\Admin\Resources\ExpenseFundingPayments\ExpenseFundingPaymentResource;
 use App\Filament\Admin\Resources\ExpenseResource;
 use App\Filament\Admin\Resources\ExpenseResource\Pages\ViewExpense;
-use App\Filament\Admin\Resources\ExpenseResource\RelationManagers\FundingPaymentsRelationManager;
+use App\Filament\Admin\Resources\ExpenseResource\RelationManagers\FundingCollectionsRelationManager;
+use App\Filament\Admin\Resources\PartnerChargeResource;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\User;
@@ -105,14 +109,36 @@ class FilamentExpenseResourcesTest extends TestCase
             ExpenseResource::class,
             $resources,
         );
+        $this->assertContains(
+            ExpenseFundingPaymentResource::class,
+            $resources,
+        );
     }
 
-    public function test_view_expense_page_includes_funding_payments_relation_manager(): void
+    public function test_financial_navigation_groups_and_order_are_configured_as_expected(): void
+    {
+        $this->assertSame('Gastos Comunes', PartnerChargeResource::getNavigationGroup());
+        $this->assertSame('Gastos Comunes', ExpenseCategoryResource::getNavigationGroup());
+        $this->assertSame('Gastos Comunes', ExpenseResource::getNavigationGroup());
+        $this->assertSame('Gastos Comunes', CollectionResource::getNavigationGroup());
+        $this->assertSame('Gastos Comunes', ExpenseFundingPaymentResource::getNavigationGroup());
+
+        $this->assertSame(10, PartnerChargeResource::getNavigationSort());
+        $this->assertSame(20, ExpenseCategoryResource::getNavigationSort());
+        $this->assertSame(30, ExpenseResource::getNavigationSort());
+        $this->assertSame(40, CollectionResource::getNavigationSort());
+        $this->assertSame(50, ExpenseFundingPaymentResource::getNavigationSort());
+
+        $this->assertSame('Finanzas', AccountingPeriodResource::getNavigationGroup());
+        $this->assertSame(10, AccountingPeriodResource::getNavigationSort());
+    }
+
+    public function test_view_expense_page_includes_funding_collections_relation_manager(): void
     {
         $page = app(ViewExpense::class);
         $relationManagers = $page->getRelationManagers();
 
-        $this->assertContains(FundingPaymentsRelationManager::class, $relationManagers);
+        $this->assertContains(FundingCollectionsRelationManager::class, $relationManagers);
     }
 
     public function test_can_duplicate_a_registered_expense(): void

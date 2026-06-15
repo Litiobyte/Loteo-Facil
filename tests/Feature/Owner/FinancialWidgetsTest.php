@@ -4,7 +4,7 @@ namespace Tests\Feature\Owner;
 
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Filament\Owner\Widgets\FinancialSummaryWidget;
-use App\Filament\Owner\Widgets\NextPaymentEstimateWidget;
+use App\Filament\Owner\Widgets\NextCollectionEstimateWidget;
 use App\Filament\Owner\Widgets\OverdueAlertsWidget;
 use App\Filament\Owner\Widgets\WelcomeWidget;
 use App\Models\Lote;
@@ -128,7 +128,7 @@ class FinancialWidgetsTest extends TestCase
         [$user] = $this->createOwner();
         $this->actingAs($user);
 
-        $data = $this->invokeProtectedMethod(new NextPaymentEstimateWidget, 'getViewData');
+        $data = $this->invokeProtectedMethod(new NextCollectionEstimateWidget, 'getViewData');
 
         $this->assertFalse($data['hasCharges']);
     }
@@ -153,7 +153,7 @@ class FinancialWidgetsTest extends TestCase
 
         $this->actingAs($user);
 
-        $data = $this->invokeProtectedMethod(new NextPaymentEstimateWidget, 'getViewData');
+        $data = $this->invokeProtectedMethod(new NextCollectionEstimateWidget, 'getViewData');
 
         $this->assertTrue($data['hasCharges']);
         $this->assertCount(2, $data['charges']);
@@ -174,7 +174,7 @@ class FinancialWidgetsTest extends TestCase
 
         $this->actingAs($user);
 
-        $data = $this->invokeProtectedMethod(new NextPaymentEstimateWidget, 'getViewData');
+        $data = $this->invokeProtectedMethod(new NextCollectionEstimateWidget, 'getViewData');
 
         $this->assertCount(5, $data['charges']);
         $this->assertSame(2, $data['remainingCount']);
@@ -187,7 +187,7 @@ class FinancialWidgetsTest extends TestCase
         $this->actingAs($user);
 
         $overdue = $this->invokeProtectedMethod(new OverdueAlertsWidget, 'getViewData');
-        $next = $this->invokeProtectedMethod(new NextPaymentEstimateWidget, 'getViewData');
+        $next = $this->invokeProtectedMethod(new NextCollectionEstimateWidget, 'getViewData');
 
         $this->assertFalse($overdue['hasAlert']);
         $this->assertFalse($next['hasCharges']);

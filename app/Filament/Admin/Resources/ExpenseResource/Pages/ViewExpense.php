@@ -4,7 +4,7 @@ namespace App\Filament\Admin\Resources\ExpenseResource\Pages;
 
 use App\Domain\Expenses\Enums\ExpenseStatus;
 use App\Filament\Admin\Resources\ExpenseResource;
-use App\Filament\Admin\Resources\ExpenseResource\RelationManagers\FundingPaymentsRelationManager;
+use App\Filament\Admin\Resources\ExpenseResource\RelationManagers\FundingCollectionsRelationManager;
 use App\Models\Expense;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
@@ -25,7 +25,7 @@ class ViewExpense extends ViewRecord
     {
         return [
             ExpenseResource\RelationManagers\ChargesRelationManager::class,
-            FundingPaymentsRelationManager::class,
+            FundingCollectionsRelationManager::class,
         ];
     }
 }

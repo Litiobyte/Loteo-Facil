@@ -3,8 +3,8 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Domain\Charges\Enums\ChargeStatus;
+use App\Domain\Collections\Enums\CollectionMethod;
 use App\Domain\Expenses\Enums\ExpenseDistributionType;
-use App\Domain\Payments\Enums\PaymentMethod;
 use App\Filament\Admin\Resources\PartnerChargeResource\Pages\ListPartnerCharges;
 use App\Filament\Admin\Resources\PartnerChargeResource\Pages\ViewPartnerCharge;
 use App\Filament\Resources\Propietarios\PropietarioResource;
@@ -41,9 +41,9 @@ class PartnerChargeResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Cobros';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
+    protected static string|UnitEnum|null $navigationGroup = 'Gastos Comunes';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {
@@ -110,7 +110,7 @@ class PartnerChargeResource extends Resource
                             ->placeholder('-')
                             ->columnSpanFull(),
                     ]),
-                Section::make('Pagos aplicados')
+                Section::make('Recaudaciones aplicados')
                     ->columns(1)
                     ->schema([
                         TextEntry::make('allocations_resume')
@@ -268,15 +268,15 @@ class PartnerChargeResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
-                Action::make('view_applied_payments')
+                Action::make('view_applied_collections')
                     ->label('Ver pagos aplicados')
                     ->icon('heroicon-o-eye')
                     ->color('info')
-                    ->modalHeading('Pagos aplicados al cobro')
+                    ->modalHeading('Recaudaciones aplicados al cobro')
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Cerrar')
                     ->modalWidth('4xl')
-                    ->modalContent(fn (PartnerCharge $record) => view('filament.admin.partner-charge.actions.view-applied-payments', [
+                    ->modalContent(fn (PartnerCharge $record) => view('filament.admin.partner-charge.actions.view-applied-collections', [
                         'allocations' => $record->allocations()
                             ->with('payment')
                             ->orderByDesc('allocated_at')
@@ -479,11 +479,11 @@ class PartnerChargeResource extends Resource
 
         $rows = $allocations
             ->map(function ($allocation): string {
-                $paymentDate = $allocation->payment?->payment_date?->format('d/m/Y') ?? '-';
-                $paymentMethod = $allocation->payment?->payment_method;
-                $methodLabel = $paymentMethod instanceof PaymentMethod
+                $paymentDate = $allocation->payment?->collection_date?->format('d/m/Y') ?? '-';
+                $paymentMethod = $allocation->payment?->collection_method;
+                $methodLabel = $paymentMethod instanceof CollectionMethod
                     ? $paymentMethod->getLabel()
-                    : ($paymentMethod ? PaymentMethod::from((string) $paymentMethod)->getLabel() : '-');
+                    : ($paymentMethod ? CollectionMethod::from((string) $paymentMethod)->getLabel() : '-');
 
                 return sprintf(
                     '<li><strong>%s</strong> · %s · %s CLP · aplicado %s</li>',

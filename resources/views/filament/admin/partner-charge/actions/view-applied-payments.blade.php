@@ -21,8 +21,8 @@
                 <tbody class="divide-y divide-gray-100 bg-white">
                     @foreach ($allocations as $allocation)
                         <tr>
-                            <td class="px-3 py-2">{{ $allocation->payment?->payment_date?->format('d/m/Y') ?? '-' }}</td>
-                            <td class="px-3 py-2">{{ $allocation->payment?->payment_method?->getLabel() ?? '-' }}</td>
+                            <td class="px-3 py-2">{{ $allocation->payment?->collection_date?->format('d/m/Y') ?? '-' }}</td>
+                            <td class="px-3 py-2">{{ $allocation->payment?->collection_method?->getLabel() ?? '-' }}</td>
                             <td class="px-3 py-2">{{ number_format((float) $allocation->amount, 2, ',', '.') }} CLP</td>
                             <td class="px-3 py-2">{{ $allocation->allocated_at?->format('d/m/Y H:i') ?? '-' }}</td>
                         </tr>

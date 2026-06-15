@@ -9,14 +9,11 @@ use Filament\Widgets\Widget;
 
 class TopDelinquentOwnersWidget extends Widget
 {
-    protected static ?int $sort = 50;
+    protected static ?int $sort = 21;
 
     protected string $view = 'filament.admin.widgets.top-delinquent-owners-widget';
 
-    protected int|string|array $columnSpan = [
-        'md' => 2,
-        'xl' => 2,
-    ];
+    protected int|string|array $columnSpan = 4;
 
     protected ?string $pollingInterval = '60s';
 
@@ -31,7 +28,6 @@ class TopDelinquentOwnersWidget extends Widget
             ->selectRaw("MAX(TRIM(propietarios.nombre || ' ' || propietarios.apellido)) as propietario_nombre")
             ->selectRaw('COUNT(partner_charges.id) as overdue_count')
             ->selectRaw('COALESCE(SUM(partner_charges.remaining_amount), 0) as overdue_total')
-            ->selectRaw('MAX(CAST(julianday(?) - julianday(partner_charges.due_date) AS INTEGER)) as max_days_overdue', [now()->toDateString()])
             ->orderByDesc('overdue_total')
             ->limit(10)
             ->get()
@@ -41,7 +37,6 @@ class TopDelinquentOwnersWidget extends Widget
                     'propietario_nombre' => (string) $row->propietario_nombre,
                     'overdue_count' => (int) $row->overdue_count,
                     'overdue_total' => round((float) $row->overdue_total, 2),
-                    'max_days_overdue' => (int) $row->max_days_overdue,
                 ];
             })
             ->all();

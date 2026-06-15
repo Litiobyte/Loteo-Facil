@@ -3,19 +3,23 @@
 namespace Tests\Feature\Admin;
 
 use App\Domain\Charges\Enums\ChargeStatus;
-use App\Domain\Payments\Enums\PaymentStatus;
-use App\Filament\Admin\Widgets\AdminCollectionsSummaryWidget;
+use App\Domain\Collections\Enums\CollectionStatus;
+use App\Filament\Admin\Widgets\CashOnHandStatWidget;
 use App\Filament\Admin\Widgets\CollectionsTrendChartWidget;
-use App\Filament\Admin\Widgets\OverdueAgingChartWidget;
-use App\Filament\Admin\Widgets\PaymentApplicationFunnelChartWidget;
+use App\Filament\Admin\Widgets\DelinquentOwnersStatWidget;
+use App\Filament\Admin\Widgets\LatestCollectionsTableWidget;
+use App\Filament\Admin\Widgets\LotsSummaryStatWidget;
+use App\Filament\Admin\Widgets\OverduePortfolioStatWidget;
+use App\Filament\Admin\Widgets\OwnersOnTimeStatWidget;
+use App\Filament\Admin\Widgets\PendingPortfolioStatWidget;
 use App\Filament\Admin\Widgets\TopDelinquentOwnersWidget;
+use App\Models\Collection;
+use App\Models\CollectionAllocation;
 use App\Models\Etapa;
 use App\Models\Expense;
 use App\Models\ExpenseFundingPayment;
 use App\Models\Lote;
 use App\Models\PartnerCharge;
-use App\Models\Payment;
-use App\Models\PaymentAllocation;
 use App\Models\Propietario;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,12 +89,12 @@ class AdminCollectionsWidgetsTest extends TestCase
             'due_date' => now()->addDays(5)->toDateString(),
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $owner->id,
             'amount' => 100000,
             'applied_amount' => 70000,
             'unapplied_amount' => 30000,
-            'status' => PaymentStatus::PartiallyApplied->value,
+            'status' => CollectionStatus::PartiallyApplied->value,
         ]);
 
         ExpenseFundingPayment::factory()->create([
@@ -101,15 +105,20 @@ class AdminCollectionsWidgetsTest extends TestCase
 
         $this->actingAs($admin);
 
-        $stats = $this->invokeProtectedMethod(new AdminCollectionsSummaryWidget, 'getStats');
+        $overdueStats = $this->invokeProtectedMethod(new OverduePortfolioStatWidget, 'getStats');
+        $onTimeStats = $this->invokeProtectedMethod(new OwnersOnTimeStatWidget, 'getStats');
+        $delinquentStats = $this->invokeProtectedMethod(new DelinquentOwnersStatWidget, 'getStats');
+        $cashStats = $this->invokeProtectedMethod(new CashOnHandStatWidget, 'getStats');
+        $pendingStats = $this->invokeProtectedMethod(new PendingPortfolioStatWidget, 'getStats');
+        $lotsStats = $this->invokeProtectedMethod(new LotsSummaryStatWidget, 'getStats');
 
-        $this->assertCount(5, $stats);
-        $this->assertSame('150000', preg_replace('/\D/', '', (string) $stats[0]->getValue()));
-        $this->assertSame('0', preg_replace('/\D/', '', (string) $stats[1]->getValue()));
-        $this->assertStringContainsString('1/3 (33,33%)', (string) $stats[2]->getValue());
-        $this->assertStringContainsString('Al día: 2', (string) $stats[2]->getDescription());
-        $this->assertSame('30000', preg_replace('/\D/', '', (string) $stats[3]->getValue()));
-        $this->assertSame('60000', preg_replace('/\D/', '', (string) $stats[4]->getValue()));
+        $this->assertSame('0', preg_replace('/\D/', '', (string) $overdueStats[0]->getValue()));
+        $this->assertSame('1', preg_replace('/\D/', '', (string) $onTimeStats[0]->getValue()));
+        $this->assertSame('2', preg_replace('/\D/', '', (string) $delinquentStats[0]->getValue()));
+        $this->assertSame('60000', preg_replace('/\D/', '', (string) $cashStats[0]->getValue()));
+        $this->assertSame('150000', preg_replace('/\D/', '', (string) $pendingStats[0]->getValue()));
+        $this->assertSame('3', preg_replace('/\D/', '', (string) $lotsStats[0]->getValue()));
+        $this->assertStringContainsString('Vendidos: 3 | Disponibles: 0 | Reservados: 0', (string) $lotsStats[0]->getDescription());
     }
 
     public function test_overdue_balance_counts_only_overdue_unpaid_expense_amounts_due_date_lte_today(): void
@@ -137,10 +146,10 @@ class AdminCollectionsWidgetsTest extends TestCase
 
         $this->actingAs($admin);
 
-        $stats = $this->invokeProtectedMethod(new AdminCollectionsSummaryWidget, 'getStats');
+        $stats = $this->invokeProtectedMethod(new OverduePortfolioStatWidget, 'getStats');
 
-        $this->assertCount(5, $stats);
-        $this->assertSame('500000', preg_replace('/\D/', '', (string) $stats[1]->getValue()));
+        $this->assertCount(1, $stats);
+        $this->assertSame('500000', preg_replace('/\D/', '', (string) $stats[0]->getValue()));
     }
 
     public function test_overdue_balance_uses_only_distributed_expenses_and_partial_funded_amount(): void
@@ -171,10 +180,10 @@ class AdminCollectionsWidgetsTest extends TestCase
 
         $this->actingAs($admin);
 
-        $stats = $this->invokeProtectedMethod(new AdminCollectionsSummaryWidget, 'getStats');
+        $stats = $this->invokeProtectedMethod(new OverduePortfolioStatWidget, 'getStats');
 
-        $this->assertCount(5, $stats);
-        $this->assertSame('700000', preg_replace('/\D/', '', (string) $stats[1]->getValue()));
+        $this->assertCount(1, $stats);
+        $this->assertSame('700000', preg_replace('/\D/', '', (string) $stats[0]->getValue()));
     }
 
     public function test_admin_collections_summary_widget_calculates_monto_en_caja_excluding_cancelled(): void
@@ -184,15 +193,15 @@ class AdminCollectionsWidgetsTest extends TestCase
 
         $owner = Propietario::factory()->create();
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $owner->id,
             'amount' => 450000,
             'applied_amount' => 300000,
             'unapplied_amount' => 150000,
-            'status' => PaymentStatus::PartiallyApplied->value,
+            'status' => CollectionStatus::PartiallyApplied->value,
         ]);
 
-        Payment::factory()->cancelled()->create([
+        Collection::factory()->cancelled()->create([
             'propietario_id' => $owner->id,
             'amount' => 999999,
             'applied_amount' => 0,
@@ -215,10 +224,10 @@ class AdminCollectionsWidgetsTest extends TestCase
 
         $this->actingAs($admin);
 
-        $stats = $this->invokeProtectedMethod(new AdminCollectionsSummaryWidget, 'getStats');
+        $stats = $this->invokeProtectedMethod(new CashOnHandStatWidget, 'getStats');
 
-        $this->assertCount(5, $stats);
-        $this->assertSame('200000', preg_replace('/\D/', '', (string) $stats[4]->getValue()));
+        $this->assertCount(1, $stats);
+        $this->assertSame('200000', preg_replace('/\D/', '', (string) $stats[0]->getValue()));
     }
 
     public function test_collections_trend_chart_returns_six_month_series(): void
@@ -246,24 +255,24 @@ class AdminCollectionsWidgetsTest extends TestCase
                 'updated_at' => now()->startOfMonth()->toDateTimeString(),
             ]);
 
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $owner->id,
             'amount' => 125000,
             'applied_amount' => 0,
             'unapplied_amount' => 125000,
-            'status' => PaymentStatus::PartiallyApplied->value,
-            'payment_date' => $paymentMonthDate->toDateString(),
+            'status' => CollectionStatus::PartiallyApplied->value,
+            'collection_date' => $paymentMonthDate->toDateString(),
         ]);
 
-        $allocation = PaymentAllocation::query()->create([
-            'payment_id' => $payment->id,
+        $allocation = CollectionAllocation::query()->create([
+            'collection_id' => $payment->id,
             'partner_charge_id' => $charge->id,
             'amount' => 40000,
             'allocated_at' => now()->toDateTimeString(),
             'created_by' => $superAdmin->id,
         ]);
 
-        DB::table('payment_allocations')
+        DB::table('collection_allocations')
             ->where('id', $allocation->id)
             ->update([
                 'allocated_at' => now()->toDateTimeString(),
@@ -280,61 +289,6 @@ class AdminCollectionsWidgetsTest extends TestCase
         $this->assertCount(6, $data['datasets'][1]['data']);
         $this->assertContains(125000.0, $data['datasets'][0]['data']);
         $this->assertContains(40000.0, $data['datasets'][1]['data']);
-    }
-
-    public function test_aging_chart_groups_overdue_balances_by_bucket(): void
-    {
-        $admin = User::factory()->create();
-        $admin->assignRole('admin');
-
-        Expense::factory()->distributed()->create([
-            'amount' => 10000,
-            'funded_amount' => 0,
-            'expense_date' => now()->subDays(30)->toDateString(),
-            'due_date' => now()->subDays(10)->toDateString(),
-        ]);
-
-        Expense::factory()->distributed()->create([
-            'amount' => 20000,
-            'funded_amount' => 0,
-            'expense_date' => now()->subDays(60)->toDateString(),
-            'due_date' => now()->subDays(40)->toDateString(),
-        ]);
-
-        Expense::factory()->distributed()->create([
-            'amount' => 30000,
-            'funded_amount' => 0,
-            'expense_date' => now()->subDays(90)->toDateString(),
-            'due_date' => now()->subDays(70)->toDateString(),
-        ]);
-
-        Expense::factory()->distributed()->create([
-            'amount' => 40000,
-            'funded_amount' => 0,
-            'expense_date' => now()->subDays(150)->toDateString(),
-            'due_date' => now()->subDays(120)->toDateString(),
-        ]);
-
-        Expense::factory()->distributed()->create([
-            'amount' => 50000,
-            'funded_amount' => 50000,
-            'expense_date' => now()->subDays(20)->toDateString(),
-            'due_date' => now()->subDays(5)->toDateString(),
-        ]);
-
-        Expense::factory()->registered()->create([
-            'amount' => 60000,
-            'funded_amount' => 0,
-            'expense_date' => now()->subDays(20)->toDateString(),
-            'due_date' => now()->subDays(5)->toDateString(),
-        ]);
-
-        $this->actingAs($admin);
-
-        $data = $this->invokeProtectedMethod(new OverdueAgingChartWidget, 'getData');
-
-        $this->assertSame(['1-30', '31-60', '61-90', '90+'], $data['labels']);
-        $this->assertEquals([10000.0, 20000.0, 30000.0, 40000.0], $data['datasets'][0]['data']);
     }
 
     public function test_morosidad_uses_active_owners_with_active_sold_lots_only(): void
@@ -368,43 +322,11 @@ class AdminCollectionsWidgetsTest extends TestCase
 
         $this->actingAs($admin);
 
-        $stats = $this->invokeProtectedMethod(new AdminCollectionsSummaryWidget, 'getStats');
+        $onTimeStats = $this->invokeProtectedMethod(new OwnersOnTimeStatWidget, 'getStats');
+        $delinquentStats = $this->invokeProtectedMethod(new DelinquentOwnersStatWidget, 'getStats');
 
-        $this->assertStringContainsString('1/2 (50,00%)', (string) $stats[2]->getValue());
-        $this->assertStringContainsString('Al día: 1', (string) $stats[2]->getDescription());
-    }
-
-    public function test_payment_application_funnel_excludes_cancelled_payments(): void
-    {
-        $admin = User::factory()->create();
-        $admin->assignRole('admin');
-
-        Payment::factory()->create([
-            'amount' => 100000,
-            'applied_amount' => 60000,
-            'unapplied_amount' => 40000,
-            'status' => PaymentStatus::PartiallyApplied->value,
-        ]);
-
-        Payment::factory()->create([
-            'amount' => 50000,
-            'applied_amount' => 0,
-            'unapplied_amount' => 50000,
-            'status' => PaymentStatus::PendingApplication->value,
-        ]);
-
-        Payment::factory()->cancelled()->create([
-            'amount' => 200000,
-            'applied_amount' => 120000,
-            'unapplied_amount' => 80000,
-        ]);
-
-        $this->actingAs($admin);
-
-        $data = $this->invokeProtectedMethod(new PaymentApplicationFunnelChartWidget, 'getData');
-
-        $this->assertSame(['Aplicado', 'No aplicado'], $data['labels']);
-        $this->assertSame([60000.0, 90000.0], $data['datasets'][0]['data']);
+        $this->assertSame('1', preg_replace('/\D/', '', (string) $onTimeStats[0]->getValue()));
+        $this->assertSame('1', preg_replace('/\D/', '', (string) $delinquentStats[0]->getValue()));
     }
 
     public function test_top_delinquent_owners_widget_returns_sorted_rows(): void
@@ -440,6 +362,31 @@ class AdminCollectionsWidgetsTest extends TestCase
         $this->assertSame(150000.0, $data['rows'][0]['overdue_total']);
     }
 
+    public function test_latest_collections_table_widget_returns_last_seven_collections(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $owner = Propietario::factory()->create();
+
+        Collection::factory()->count(9)->create([
+            'propietario_id' => $owner->id,
+            'collection_date' => now()->subDays(20)->toDateString(),
+        ]);
+
+        $latest = Collection::factory()->create([
+            'propietario_id' => $owner->id,
+            'collection_date' => now()->toDateString(),
+        ]);
+
+        $this->actingAs($admin);
+
+        $data = $this->invokeProtectedMethod(new LatestCollectionsTableWidget, 'getViewData');
+
+        $this->assertCount(7, $data['rows']);
+        $this->assertSame($latest->id, $data['rows'][0]['id']);
+    }
+
     public function test_admin_widgets_are_hidden_for_owner_role(): void
     {
         $ownerUser = User::factory()->create();
@@ -447,10 +394,14 @@ class AdminCollectionsWidgetsTest extends TestCase
 
         $this->actingAs($ownerUser);
 
-        $this->assertFalse(AdminCollectionsSummaryWidget::canView());
+        $this->assertFalse(OverduePortfolioStatWidget::canView());
+        $this->assertFalse(OwnersOnTimeStatWidget::canView());
+        $this->assertFalse(DelinquentOwnersStatWidget::canView());
+        $this->assertFalse(CashOnHandStatWidget::canView());
+        $this->assertFalse(PendingPortfolioStatWidget::canView());
+        $this->assertFalse(LotsSummaryStatWidget::canView());
+        $this->assertFalse(LatestCollectionsTableWidget::canView());
         $this->assertFalse(CollectionsTrendChartWidget::canView());
-        $this->assertFalse(OverdueAgingChartWidget::canView());
-        $this->assertFalse(PaymentApplicationFunnelChartWidget::canView());
         $this->assertFalse(TopDelinquentOwnersWidget::canView());
     }
 

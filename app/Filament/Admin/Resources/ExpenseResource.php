@@ -57,9 +57,9 @@ class ExpenseResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Gastos';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
+    protected static string|UnitEnum|null $navigationGroup = 'Gastos Comunes';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 30;
 
     public static function form(Schema $schema): Schema
     {
@@ -495,7 +495,7 @@ class ExpenseResource extends Resource
                             $cashAfter = app(CashBalanceService::class)->getAvailableCash();
 
                             Notification::make()
-                                ->title('Pago registrado desde caja')
+                                ->title('Recaudacion registrado desde caja')
                                 ->body('Pagado acumulado: $'.number_format((float) $updated->funded_amount, 0, ',', '.').' CLP. Saldo pendiente: $'.number_format($remaining, 0, ',', '.').' CLP. Caja disponible actual: $'.number_format($cashAfter, 0, ',', '.').' CLP.')
                                 ->success()
                                 ->send();

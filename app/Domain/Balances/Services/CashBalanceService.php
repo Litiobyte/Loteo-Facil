@@ -2,9 +2,9 @@
 
 namespace App\Domain\Balances\Services;
 
-use App\Domain\Payments\Enums\PaymentStatus;
+use App\Domain\Collections\Enums\CollectionStatus;
+use App\Models\Collection;
 use App\Models\ExpenseFundingPayment;
-use App\Models\Payment;
 
 class CashBalanceService
 {
@@ -20,8 +20,8 @@ class CashBalanceService
 
     public function getTotalIncome(): float
     {
-        return round((float) Payment::query()
-            ->where('status', '!=', PaymentStatus::Cancelled->value)
+        return round((float) Collection::query()
+            ->where('status', '!=', CollectionStatus::Cancelled->value)
             ->sum('amount'), 2);
     }
 

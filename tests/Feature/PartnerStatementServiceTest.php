@@ -4,14 +4,14 @@ namespace Tests\Feature;
 
 use App\Domain\Balances\Services\PartnerBalanceService;
 use App\Domain\Charges\Enums\ChargeStatus;
-use App\Domain\Payments\Services\PaymentApplicationService;
+use App\Domain\Collections\Services\CollectionApplicationService;
 use App\Domain\Statements\Services\PartnerStatementService;
+use App\Models\Collection;
 use App\Models\Etapa;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\Lote;
 use App\Models\PartnerCharge;
-use App\Models\Payment;
 use App\Models\Propietario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -51,7 +51,7 @@ class PartnerStatementServiceTest extends TestCase
         $this->assertArrayHasKey('lots', $statement);
         $this->assertArrayHasKey('summary', $statement);
         $this->assertArrayHasKey('charges', $statement);
-        $this->assertArrayHasKey('payments', $statement);
+        $this->assertArrayHasKey('collections', $statement);
         $this->assertArrayHasKey('allocations', $statement);
         $this->assertArrayHasKey('timeline', $statement);
 
@@ -121,50 +121,50 @@ class PartnerStatementServiceTest extends TestCase
         $this->assertEquals($recentCharge->id, $charges->first()->id);
     }
 
-    public function test_get_payments_detail_returns_all_payments(): void
+    public function test_get_collections_detail_returns_all_collections(): void
     {
         // Arrange
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 200.00,
         ]);
 
         // Act
-        $payments = $this->service->getPaymentsDetail($this->propietario);
+        $collections = $this->service->getCollectionsDetail($this->propietario);
 
         // Assert
-        $this->assertCount(2, $payments);
-        $this->assertInstanceOf(Payment::class, $payments->first());
+        $this->assertCount(2, $collections);
+        $this->assertInstanceOf(Collection::class, $collections->first());
     }
 
-    public function test_get_payments_detail_filters_by_date_range(): void
+    public function test_get_collections_detail_filters_by_date_range(): void
     {
         // Arrange
-        $oldPayment = Payment::factory()->create([
+        $oldCollection = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
-            'payment_date' => Carbon::parse('2024-01-15'),
+            'collection_date' => Carbon::parse('2024-01-15'),
         ]);
 
-        $recentPayment = Payment::factory()->create([
+        $recentCollection = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
-            'payment_date' => Carbon::parse('2024-06-15'),
+            'collection_date' => Carbon::parse('2024-06-15'),
         ]);
 
         // Act
-        $payments = $this->service->getPaymentsDetail(
+        $collections = $this->service->getCollectionsDetail(
             $this->propietario,
             Carbon::parse('2024-06-01'),
             Carbon::parse('2024-06-30')
         );
 
         // Assert
-        $this->assertCount(1, $payments);
-        $this->assertEquals($recentPayment->id, $payments->first()->id);
+        $this->assertCount(1, $collections);
+        $this->assertEquals($recentCollection->id, $collections->first()->id);
     }
 
     public function test_get_allocations_detail_returns_all_allocations(): void
@@ -176,20 +176,20 @@ class PartnerStatementServiceTest extends TestCase
             'status' => ChargeStatus::Pending,
         ]);
 
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
         ]);
 
-        $applicationService = new PaymentApplicationService;
-        $applicationService->applyPaymentAutomatically($payment);
+        $applicationService = new CollectionApplicationService;
+        $applicationService->applyCollectionAutomatically($payment);
 
         // Act
         $allocations = $this->service->getAllocationsDetail($this->propietario);
 
         // Assert
         $this->assertCount(1, $allocations);
-        $this->assertEquals($payment->id, $allocations->first()->payment_id);
+        $this->assertEquals($payment->id, $allocations->first()->collection_id);
         $this->assertEquals($charge->id, $allocations->first()->partner_charge_id);
     }
 
@@ -203,15 +203,15 @@ class PartnerStatementServiceTest extends TestCase
             'created_at' => Carbon::parse('2024-06-01 10:00:00'),
         ]);
 
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
-            'payment_date' => Carbon::parse('2024-06-05'),
+            'collection_date' => Carbon::parse('2024-06-05'),
             'created_at' => Carbon::parse('2024-06-05 14:00:00'),
         ]);
 
-        $applicationService = new PaymentApplicationService;
-        $applicationService->applyPaymentAutomatically($payment);
+        $applicationService = new CollectionApplicationService;
+        $applicationService->applyCollectionAutomatically($payment);
 
         // Act
         $timeline = $this->service->getMovementTimeline($this->propietario);
@@ -232,9 +232,9 @@ class PartnerStatementServiceTest extends TestCase
             'created_at' => Carbon::parse('2024-01-15'),
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
-            'payment_date' => Carbon::parse('2024-06-15'),
+            'collection_date' => Carbon::parse('2024-06-15'),
             'created_at' => Carbon::parse('2024-06-15'),
         ]);
 
@@ -255,7 +255,7 @@ class PartnerStatementServiceTest extends TestCase
             'status' => ChargeStatus::Pending,
         ]);
 
-        $payment = Payment::factory()->create([
+        $payment = Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 100.00,
         ]);
@@ -284,14 +284,14 @@ class PartnerStatementServiceTest extends TestCase
             'created_at' => Carbon::parse('2024-06-15'),
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
-            'payment_date' => Carbon::parse('2024-01-20'),
+            'collection_date' => Carbon::parse('2024-01-20'),
         ]);
 
-        Payment::factory()->create([
+        Collection::factory()->create([
             'propietario_id' => $this->propietario->id,
-            'payment_date' => Carbon::parse('2024-06-20'),
+            'collection_date' => Carbon::parse('2024-06-20'),
         ]);
 
         // Act
@@ -303,7 +303,7 @@ class PartnerStatementServiceTest extends TestCase
 
         // Assert - only June data
         $this->assertCount(1, $statement['charges']);
-        $this->assertCount(1, $statement['payments']);
+        $this->assertCount(1, $statement['collections']);
     }
 
     public function test_lots_info_includes_hectares_calculation(): void

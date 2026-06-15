@@ -78,17 +78,17 @@ class ExpenseFundingPaymentService
         }
 
         return DB::transaction(function () use ($payment, $roundedAmount, $paymentDate, $notes, $allowNegativeCash): ExpenseFundingPayment {
-            /** @var ExpenseFundingPayment $lockedPayment */
-            $lockedPayment = ExpenseFundingPayment::query()
+            /** @var ExpenseFundingPayment $lockedCollection */
+            $lockedCollection = ExpenseFundingPayment::query()
                 ->with('expense')
                 ->lockForUpdate()
                 ->findOrFail($payment->id);
 
-            if ($lockedPayment->is_void) {
+            if ($lockedCollection->is_void) {
                 throw new DomainException('No se puede editar un egreso anulado.');
             }
 
-            $expense = Expense::query()->lockForUpdate()->findOrFail($lockedPayment->expense_id);
+            $expense = Expense::query()->lockForUpdate()->findOrFail($lockedCollection->expense_id);
 
             $this->ensureLegacyFundingSeeded($expense);
 
@@ -96,13 +96,13 @@ class ExpenseFundingPaymentService
                 throw new DomainException('No se puede editar egresos de gastos cancelados o no distribuidos.');
             }
 
-            $activePaymentsSum = (float) ExpenseFundingPayment::query()
+            $activeCollectionsSum = (float) ExpenseFundingPayment::query()
                 ->where('expense_id', $expense->id)
                 ->where('is_void', false)
-                ->where('id', '!=', $lockedPayment->id)
+                ->where('id', '!=', $lockedCollection->id)
                 ->sum('amount');
 
-            $projectedFunded = round($activePaymentsSum + $roundedAmount, 2);
+            $projectedFunded = round($activeCollectionsSum + $roundedAmount, 2);
 
             if ($projectedFunded > round((float) $expense->amount, 2)) {
                 throw ValidationException::withMessages([
@@ -110,7 +110,7 @@ class ExpenseFundingPaymentService
                 ]);
             }
 
-            $netIncrease = round($roundedAmount - (float) $lockedPayment->amount, 2);
+            $netIncrease = round($roundedAmount - (float) $lockedCollection->amount, 2);
             $projectedCash = $this->cashBalanceService->getProjectedCashAfterFunding(max($netIncrease, 0));
 
             if ($projectedCash < 0 && ! $allowNegativeCash) {
@@ -119,7 +119,7 @@ class ExpenseFundingPaymentService
                 ]);
             }
 
-            $lockedPayment->update([
+            $lockedCollection->update([
                 'amount' => $roundedAmount,
                 'payment_date' => $paymentDate,
                 'notes' => $notes,
@@ -128,7 +128,7 @@ class ExpenseFundingPaymentService
 
             $this->refreshExpenseFundingStatus($expense);
 
-            return $lockedPayment->fresh() ?? $lockedPayment;
+            return $lockedCollection->fresh() ?? $lockedCollection;
         });
     }
 
@@ -141,18 +141,18 @@ class ExpenseFundingPaymentService
         }
 
         return DB::transaction(function () use ($payment, $reason): ExpenseFundingPayment {
-            /** @var ExpenseFundingPayment $lockedPayment */
-            $lockedPayment = ExpenseFundingPayment::query()->lockForUpdate()->findOrFail($payment->id);
+            /** @var ExpenseFundingPayment $lockedCollection */
+            $lockedCollection = ExpenseFundingPayment::query()->lockForUpdate()->findOrFail($payment->id);
 
-            if ($lockedPayment->is_void) {
+            if ($lockedCollection->is_void) {
                 throw new DomainException('El egreso ya está anulado.');
             }
 
-            $expense = Expense::query()->lockForUpdate()->findOrFail($lockedPayment->expense_id);
+            $expense = Expense::query()->lockForUpdate()->findOrFail($lockedCollection->expense_id);
 
             $this->ensureLegacyFundingSeeded($expense);
 
-            $lockedPayment->update([
+            $lockedCollection->update([
                 'is_void' => true,
                 'voided_at' => now(),
                 'voided_by' => auth()->id(),
@@ -162,7 +162,7 @@ class ExpenseFundingPaymentService
 
             $this->refreshExpenseFundingStatus($expense);
 
-            return $lockedPayment->fresh() ?? $lockedPayment;
+            return $lockedCollection->fresh() ?? $lockedCollection;
         });
     }
 
@@ -186,11 +186,11 @@ class ExpenseFundingPaymentService
 
     private function ensureLegacyFundingSeeded(Expense $expense): void
     {
-        $existingPayments = ExpenseFundingPayment::query()
+        $existingCollections = ExpenseFundingPayment::query()
             ->where('expense_id', $expense->id)
             ->exists();
 
-        if ($existingPayments || (float) $expense->funded_amount <= 0) {
+        if ($existingCollections || (float) $expense->funded_amount <= 0) {
             return;
         }
 
