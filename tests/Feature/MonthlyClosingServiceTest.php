@@ -15,6 +15,7 @@ use App\Models\Propietario;
 use App\Models\User;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class MonthlyClosingServiceTest extends TestCase
@@ -36,11 +37,20 @@ class MonthlyClosingServiceTest extends TestCase
         $this->user = User::factory()->create();
     }
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
     /**
      * @throws DomainException
      */
     public function test_can_close_open_period_and_generate_folio_with_snapshot(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-08-10 12:00:00'));
+
         $targetDate = now()->startOfMonth()->addDays(5);
 
         PartnerCharge::factory()->create([
