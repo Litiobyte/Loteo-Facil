@@ -18,10 +18,12 @@ return new class extends Migration
             $table->text('notas')->nullable()->after('valor_lote');
         });
 
+        $driver = Schema::getConnection()->getDriverName();
+
         DB::table('lotes')
             ->whereNotNull('hectareas')
             ->update([
-                'metros_cuadrados' => DB::raw('CAST(hectareas * 10000 AS INTEGER)'),
+                'metros_cuadrados' => DB::raw('CAST(hectareas * 10000 AS '.($driver === 'mysql' ? 'SIGNED' : 'INTEGER').')'),
             ]);
     }
 
