@@ -104,7 +104,7 @@ class SecurityTest extends TestCase
 
         $this->actingAs($userA);
 
-        $this->assertSame(2, MisCobrosResource::getEloquentQuery()->count());
+        $this->assertSame(3, MisCobrosResource::getEloquentQuery()->count());
         $this->assertSame(1, MyCollectionsResource::getEloquentQuery()->count());
     }
 
