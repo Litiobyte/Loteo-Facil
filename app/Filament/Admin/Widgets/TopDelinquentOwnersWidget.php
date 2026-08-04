@@ -6,6 +6,7 @@ use App\Domain\Charges\Enums\ChargeStatus;
 use App\Filament\Admin\Resources\PartnerChargeResource;
 use App\Models\PartnerCharge;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Facades\DB;
 
 class TopDelinquentOwnersWidget extends Widget
 {
@@ -19,13 +20,17 @@ class TopDelinquentOwnersWidget extends Widget
 
     protected function getViewData(): array
     {
+        $nameExpression = DB::connection()->getDriverName() === 'mysql'
+            ? "MAX(TRIM(CONCAT(propietarios.nombre, ' ', propietarios.apellido)))"
+            : "MAX(TRIM(propietarios.nombre || ' ' || propietarios.apellido))";
+
         $rows = PartnerCharge::query()
             ->whereDate('due_date', '<', now()->toDateString())
             ->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Partial->value])
             ->join('propietarios', 'propietarios.id', '=', 'partner_charges.propietario_id')
             ->groupBy('partner_charges.propietario_id', 'propietarios.nombre', 'propietarios.apellido')
             ->selectRaw('partner_charges.propietario_id as propietario_id')
-            ->selectRaw("MAX(TRIM(propietarios.nombre || ' ' || propietarios.apellido)) as propietario_nombre")
+            ->selectRaw("{$nameExpression} as propietario_nombre")
             ->selectRaw('COUNT(partner_charges.id) as overdue_count')
             ->selectRaw('COALESCE(SUM(partner_charges.remaining_amount), 0) as overdue_total')
             ->orderByDesc('overdue_total')
