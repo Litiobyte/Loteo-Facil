@@ -1,0 +1,72 @@
+name: PR Tests
+
+on:
+  pull_request:
+
+concurrency:
+  group: pr-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit
+            command: php artisan test --compact tests/Unit
+          - name: Feature Domain
+            command: bash -O extglob -c 'php artisan test --compact tests/Feature/!(Filament*)Test.php'
+          - name: Feature Filament Admin
+            command: php artisan test --compact tests/Feature/Filament*Test.php tests/Feature/Admin
+          - name: Feature Owner
+            command: php artisan test --compact tests/Feature/Owner
+
+    env:
+      APP_ENV: testing
+      BCRYPT_ROUNDS: 4
+      BROADCAST_CONNECTION: 'null'
+      CACHE_STORE: array
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, ctype, dom, fileinfo, filter, json, mbstring, openssl, pdo, pdo_sqlite, tokenizer, xml
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prepare environment
+        run: cp .env.example .env
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Prepare application
+        run: php artisan key:generate --no-interaction
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Run tests
+        run: ${{ matrix.command }}

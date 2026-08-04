@@ -238,7 +238,6 @@ class ExpenseResource extends Resource
                     ->sortable(),
                 TextColumn::make('charges_count')
                     ->label('Cobros generados')
-                    ->counts('charges')
                     ->badge()
                     ->color('info')
                     ->formatStateUsing(fn ($state): string => $state > 0 ? "{$state} cobros" : 'Sin cobros')

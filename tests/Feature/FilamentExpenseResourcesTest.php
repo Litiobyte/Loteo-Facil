@@ -13,6 +13,7 @@ use App\Filament\Admin\Resources\ExpenseResource\RelationManagers\FundingCollect
 use App\Filament\Admin\Resources\PartnerChargeResource;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\PartnerCharge;
 use App\Models\User;
 use Filament\PanelRegistry;
 use Illuminate\Database\Eloquent\Collection;
@@ -227,5 +228,20 @@ class FilamentExpenseResourcesTest extends TestCase
             'expense_date' => $targetMonth->copy()->setDay(1)->format('Y-m-d 00:00:00'),
             'status' => ExpenseStatus::Registered->value,
         ]);
+    }
+
+    public function test_admin_can_view_expenses_index_page_with_charges_count(): void
+    {
+        Role::findOrCreate('super_admin', 'web');
+
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole('super_admin');
+
+        $expense = Expense::factory()->distributed()->create();
+        PartnerCharge::factory()->create(['expense_id' => $expense->id]);
+
+        $this->actingAs($superAdmin);
+
+        $this->get('/admin/expenses')->assertOk();
     }
 }

@@ -156,7 +156,7 @@ class CollectionApplicationService
         return PartnerCharge::query()
             ->where('propietario_id', $payment->propietario_id)
             ->unpaid()
-            ->orderByRaw('due_date ASC NULLS LAST')
+            ->orderByRaw('due_date IS NULL ASC, due_date ASC')
             ->orderBy('created_at', 'asc')
             ->get();
     }

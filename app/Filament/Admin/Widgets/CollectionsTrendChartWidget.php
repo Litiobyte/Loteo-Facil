@@ -6,6 +6,7 @@ use App\Models\CollectionAllocation;
 use App\Models\PartnerCharge;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CollectionsTrendChartWidget extends ChartWidget
 {
@@ -30,7 +31,7 @@ class CollectionsTrendChartWidget extends ChartWidget
                 $months[0]['start']->copy()->startOfDay(),
                 $months[5]['end']->copy()->endOfDay(),
             ])
-            ->selectRaw("strftime('%Y-%m', due_date) as month_key")
+            ->selectRaw($this->monthKeyExpression('due_date').' as month_key')
             ->selectRaw('COALESCE(SUM(amount), 0) as total_amount')
             ->groupBy('month_key')
             ->pluck('total_amount', 'month_key');
@@ -41,7 +42,7 @@ class CollectionsTrendChartWidget extends ChartWidget
                 $months[0]['start']->copy()->startOfDay(),
                 $months[5]['end']->copy()->endOfDay(),
             ])
-            ->selectRaw("strftime('%Y-%m', collections.collection_date) as month_key")
+            ->selectRaw($this->monthKeyExpression('collections.collection_date').' as month_key')
             ->selectRaw('COALESCE(SUM(collection_allocations.amount), 0) as total_amount')
             ->groupBy('month_key')
             ->pluck('total_amount', 'month_key');
@@ -81,6 +82,13 @@ class CollectionsTrendChartWidget extends ChartWidget
     protected function getType(): string
     {
         return 'line';
+    }
+
+    private function monthKeyExpression(string $column): string
+    {
+        return DB::connection()->getDriverName() === 'mysql'
+            ? "DATE_FORMAT({$column}, '%Y-%m')"
+            : "strftime('%Y-%m', {$column})";
     }
 
     /**
