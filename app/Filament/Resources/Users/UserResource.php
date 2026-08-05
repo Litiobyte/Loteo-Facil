@@ -18,10 +18,10 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use UnitEnum;
 
 class UserResource extends Resource
 {
@@ -34,6 +34,10 @@ class UserResource extends Resource
     protected static ?string $modelLabel = 'Usuario';
 
     protected static ?string $pluralModelLabel = 'Usuarios';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Administración';
+
+    protected static ?int $navigationSort = 30;
 
     public static function form(Schema $schema): Schema
     {

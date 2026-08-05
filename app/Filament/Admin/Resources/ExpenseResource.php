@@ -57,9 +57,9 @@ class ExpenseResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Gastos';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Gastos Comunes';
+    protected static string|UnitEnum|null $navigationGroup = 'Gastos';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {

@@ -26,6 +26,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 class PropietarioResource extends Resource
 {
@@ -38,6 +39,10 @@ class PropietarioResource extends Resource
     protected static ?string $modelLabel = 'Propietario';
 
     protected static ?string $pluralModelLabel = 'Propietarios';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Administración';
+
+    protected static ?int $navigationSort = 20;
 
     public static function form(Schema $schema): Schema
     {

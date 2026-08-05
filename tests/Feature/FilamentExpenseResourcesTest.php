@@ -119,16 +119,18 @@ class FilamentExpenseResourcesTest extends TestCase
     public function test_financial_navigation_groups_and_order_are_configured_as_expected(): void
     {
         $this->assertSame('Gastos Comunes', PartnerChargeResource::getNavigationGroup());
-        $this->assertSame('Gastos Comunes', ExpenseCategoryResource::getNavigationGroup());
-        $this->assertSame('Gastos Comunes', ExpenseResource::getNavigationGroup());
         $this->assertSame('Gastos Comunes', CollectionResource::getNavigationGroup());
-        $this->assertSame('Gastos Comunes', ExpenseFundingPaymentResource::getNavigationGroup());
+
+        $this->assertSame('Gastos', ExpenseCategoryResource::getNavigationGroup());
+        $this->assertSame('Gastos', ExpenseResource::getNavigationGroup());
+        $this->assertSame('Gastos', ExpenseFundingPaymentResource::getNavigationGroup());
 
         $this->assertSame(10, PartnerChargeResource::getNavigationSort());
-        $this->assertSame(20, ExpenseCategoryResource::getNavigationSort());
-        $this->assertSame(30, ExpenseResource::getNavigationSort());
-        $this->assertSame(40, CollectionResource::getNavigationSort());
-        $this->assertSame(50, ExpenseFundingPaymentResource::getNavigationSort());
+        $this->assertSame(20, CollectionResource::getNavigationSort());
+
+        $this->assertSame(10, ExpenseResource::getNavigationSort());
+        $this->assertSame(20, ExpenseFundingPaymentResource::getNavigationSort());
+        $this->assertSame(30, ExpenseCategoryResource::getNavigationSort());
 
         $this->assertSame('Finanzas', AccountingPeriodResource::getNavigationGroup());
         $this->assertSame(10, AccountingPeriodResource::getNavigationSort());
