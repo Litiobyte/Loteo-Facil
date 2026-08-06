@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\Importaciones;
-use App\Filament\Admin\Pages\Proveedores;
+use App\Filament\Admin\Resources\Suppliers\SupplierResource;
 use App\Filament\Resources\Lotes\LoteResource;
 use App\Filament\Resources\Propietarios\PropietarioResource;
 use App\Filament\Resources\Users\UserResource;
@@ -33,14 +33,14 @@ class FilamentAdminNavigationTest extends TestCase
         $this->assertSame(30, UserResource::getNavigationSort());
     }
 
-    public function test_proveedores_placeholder_is_registered_in_gastos_group(): void
+    public function test_proveedores_resource_is_registered_in_gastos_group(): void
     {
-        $this->assertSame('Gastos', Proveedores::getNavigationGroup());
-        $this->assertSame(40, Proveedores::getNavigationSort());
+        $this->assertSame('Gastos', SupplierResource::getNavigationGroup());
+        $this->assertSame(40, SupplierResource::getNavigationSort());
 
         $panel = app(PanelRegistry::class)->get('admin');
 
-        $this->assertContains(Proveedores::class, $panel->getPages());
+        $this->assertContains(SupplierResource::class, $panel->getResources());
     }
 
     public function test_importaciones_page_is_registered_in_admin_panel(): void

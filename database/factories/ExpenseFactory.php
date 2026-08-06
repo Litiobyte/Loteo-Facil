@@ -6,6 +6,7 @@ use App\Domain\Expenses\Enums\ExpenseDistributionType;
 use App\Domain\Expenses\Enums\ExpenseStatus;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -28,6 +29,7 @@ class ExpenseFactory extends Factory
 
         return [
             'expense_category_id' => ExpenseCategory::factory(),
+            'supplier_id' => fake()->boolean(70) ? Supplier::factory() : null,
             'title' => fake()->randomElement([
                 'Recaudacion de asesoría contable mensual',
                 'Inscripción de documentos en conservador',
