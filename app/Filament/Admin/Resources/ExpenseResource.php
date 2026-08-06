@@ -12,6 +12,8 @@ use App\Filament\Admin\Resources\ExpenseResource\Pages\EditExpense;
 use App\Filament\Admin\Resources\ExpenseResource\Pages\ListExpenses;
 use App\Filament\Admin\Resources\ExpenseResource\Pages\ViewExpense;
 use App\Models\Expense;
+use App\Rules\ValidChileanRut;
+use App\Support\ChileanRut;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -93,6 +95,45 @@ class ExpenseResource extends Resource
                                     ->default(true)
                                     ->required(),
                             ]),
+                        Select::make('supplier_id')
+                            ->label('Proveedor')
+                            ->relationship('supplier', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->createOptionForm([
+                                TextInput::make('name')
+                                    ->label('Nombre')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->unique(table: 'suppliers', column: 'name'),
+                                TextInput::make('rut')
+                                    ->label('RUT')
+                                    ->required()
+                                    ->maxLength(20)
+                                    ->formatStateUsing(fn (?string $state): ?string => ChileanRut::normalize($state))
+                                    ->dehydrateStateUsing(fn (?string $state): ?string => ChileanRut::normalize($state))
+                                    ->rule(new ValidChileanRut)
+                                    ->unique(table: 'suppliers', column: 'rut'),
+                                TextInput::make('phone')
+                                    ->label('Teléfono')
+                                    ->nullable()
+                                    ->maxLength(50),
+                                TextInput::make('email')
+                                    ->label('Email')
+                                    ->email()
+                                    ->nullable()
+                                    ->maxLength(255)
+                                    ->unique(table: 'suppliers', column: 'email'),
+                                TextInput::make('address')
+                                    ->label('Dirección')
+                                    ->nullable()
+                                    ->maxLength(255),
+                                Textarea::make('notes')
+                                    ->label('Observaciones')
+                                    ->nullable()
+                                    ->rows(3),
+                            ]),
                         TextInput::make('amount')
                             ->label('Monto')
                             ->required()
@@ -166,7 +207,7 @@ class ExpenseResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('category')->withCount('charges'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['category', 'supplier'])->withCount('charges'))
             ->defaultSort('expense_date', 'desc')
             ->columns([
                 TextColumn::make('title')
@@ -176,6 +217,10 @@ class ExpenseResource extends Resource
                     ->limit(40),
                 TextColumn::make('category.name')
                     ->label('Categoría')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('supplier.name')
+                    ->label('Proveedor')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('amount')
@@ -622,6 +667,7 @@ class ExpenseResource extends Resource
     {
         return Expense::query()->create([
             'expense_category_id' => $record->expense_category_id,
+            'supplier_id' => $record->supplier_id,
             'title' => $record->title,
             'description' => $record->description,
             'amount' => (float) $data['amount'],

@@ -12,6 +12,7 @@ use App\Models\Lote;
 use App\Models\PartnerCharge;
 use App\Models\Propietario;
 use App\Models\Region;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -37,6 +38,7 @@ class EmptyInitialStateTest extends TestCase
         $this->seed();
 
         $this->assertSame(0, ExpenseCategory::query()->count());
+        $this->assertSame(0, Supplier::query()->count());
         $this->assertSame(0, Lote::query()->count());
         $this->assertSame(0, Propietario::query()->count());
         $this->assertSame(0, Expense::query()->count());
