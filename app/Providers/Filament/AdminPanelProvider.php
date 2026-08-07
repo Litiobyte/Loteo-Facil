@@ -23,6 +23,7 @@ use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Foundation\Vite;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
@@ -43,6 +44,10 @@ class AdminPanelProvider extends PanelProvider
                     'linkText' => 'Ingresar aqui',
                     'routeName' => 'filament.owner.auth.login',
                 ])->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => app(Vite::class)(['resources/css/app.css'])->toHtml(),
             )
             ->colors([
                 'primary' => Color::Amber,

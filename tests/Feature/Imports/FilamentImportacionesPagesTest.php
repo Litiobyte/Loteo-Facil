@@ -111,6 +111,12 @@ class FilamentImportacionesPagesTest extends TestCase
             ])
             ->assertOk()
             ->assertSee('Resultado de la importación')
+            ->assertSee('Total de filas')
+            ->assertSee('Creados')
+            ->assertSee('Actualizados')
+            ->assertSee('Con errores')
+            ->assertSee('Detalle de errores')
+            ->assertSee('Fila 2')
             ->assertSee('El campo estado tiene un valor no permitido.');
     }
 
