@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Comuna;
+use App\Models\Propietario;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -21,7 +23,7 @@ class DatabaseSeeder extends Seeder
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('propietario', 'web');
 
-        // Datos de referencia geográfica y de infraestructura
+        // Datos de referencia geográfica y de infraestructura (seguros de repetir)
         $this->call([
             RegionSeeder::class,
             EtapaSeeder::class,
@@ -36,5 +38,58 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $superAdmin->assignRole('super_admin');
+
+        // Datos de demostración: solo se siembran en desarrollo local,
+        // nunca en los despliegues de producción.
+        if (! app()->environment('local')) {
+            return;
+        }
+
+        $this->call([
+            LoteSeeder::class,
+            PropietarioSeeder::class,
+            ExpenseCategorySeeder::class,
+            ExpenseSeeder::class,
+            PartnerChargeSeeder::class,
+        ]);
+
+        $admin = User::query()->firstOrCreate([
+            'email' => 'admin@loteofacil.cl',
+        ], [
+            'name' => 'Admin Loteo Facil',
+            'password' => 'password',
+        ]);
+
+        $admin->assignRole('admin');
+
+        $propietario = User::query()->firstOrCreate([
+            'email' => 'propietario@loteofacil.cl',
+        ], [
+            'name' => 'Propietario Demo',
+            'password' => 'password',
+        ]);
+
+        $propietario->assignRole('propietario');
+
+        $comuna = Comuna::query()->first();
+
+        if ($comuna) {
+            Propietario::query()->firstOrCreate(
+                ['user_id' => $propietario->id],
+                [
+                    'nombre' => 'Propietario',
+                    'apellido' => 'Demo',
+                    'rut' => '11.111.111-1',
+                    'telefono' => '+56911111111',
+                    'direccion' => 'Direccion Demo 123',
+                    'region_id' => $comuna->region_id,
+                    'comuna_id' => $comuna->id,
+                    'nacionalidad' => 'Chilena',
+                    'profesion' => 'Agricultor',
+                    'estado_civil' => 'Soltero',
+                    'email' => 'propietario@loteofacil.cl',
+                ]
+            );
+        }
     }
 }
