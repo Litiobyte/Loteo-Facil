@@ -69,8 +69,11 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->collapsedSidebarWidth('5rem')
             ->navigationGroups([
+                NavigationGroup::make('Administración'),
                 NavigationGroup::make('Gastos Comunes'),
+                NavigationGroup::make('Gastos'),
                 NavigationGroup::make('Finanzas'),
+                NavigationGroup::make('Importaciones'),
             ])
             ->middleware([
                 EncryptCookies::class,

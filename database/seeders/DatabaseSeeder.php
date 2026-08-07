@@ -23,18 +23,13 @@ class DatabaseSeeder extends Seeder
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('propietario', 'web');
 
-        // Luego ejecutar los seeders de datos geográficos y de negocio
+        // Datos de referencia geográfica y de infraestructura (seguros de repetir)
         $this->call([
             RegionSeeder::class,
             EtapaSeeder::class,
-            LoteSeeder::class,
-            PropietarioSeeder::class,
-            ExpenseCategorySeeder::class,
-            ExpenseSeeder::class,
-            PartnerChargeSeeder::class,
         ]);
 
-        // Finalmente crear usuarios administradores de prueba
+        // Único usuario inicial del sistema
         $superAdmin = User::query()->firstOrCreate([
             'email' => 'superadmin@loteofacil.cl',
         ], [
@@ -43,6 +38,20 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $superAdmin->assignRole('super_admin');
+
+        // Datos de demostración: solo se siembran en desarrollo local,
+        // nunca en los despliegues de producción.
+        if (! app()->environment('local')) {
+            return;
+        }
+
+        $this->call([
+            LoteSeeder::class,
+            PropietarioSeeder::class,
+            ExpenseCategorySeeder::class,
+            ExpenseSeeder::class,
+            PartnerChargeSeeder::class,
+        ]);
 
         $admin = User::query()->firstOrCreate([
             'email' => 'admin@loteofacil.cl',
