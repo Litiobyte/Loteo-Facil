@@ -6,10 +6,8 @@
         </x-slot>
 
         <ul class="list-inside list-disc space-y-1 text-sm text-gray-600 dark:text-gray-300">
-            <li>Usa el botón "Descargar plantilla" para obtener un archivo de ejemplo.</li>
-            <li>La primera fila del archivo debe contener los nombres de las columnas.</li>
-            <li>Estados válidos: <code>disponible</code>, <code>reservado</code>, <code>vendido</code>.</li>
-            <li>La columna <code>etapa</code> acepta el número o el nombre de una etapa existente.</li>
+            <li>Descarga la plantilla para obtener un archivo de ejemplo.</li>
+
         </ul>
     </x-filament::section>
 

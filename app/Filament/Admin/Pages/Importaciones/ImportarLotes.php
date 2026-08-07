@@ -5,6 +5,7 @@ namespace App\Filament\Admin\Pages\Importaciones;
 use App\Domain\Imports\DataTransferObjects\ImportResult;
 use App\Domain\Imports\DataTransferObjects\ParsedFile;
 use App\Domain\Imports\Services\LoteImportService;
+use App\Domain\Imports\Support\ImportTemplateOptions;
 use App\Filament\Admin\Pages\Importaciones\Concerns\ManagesImport;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -42,5 +43,13 @@ class ImportarLotes extends Page
     protected function executeImport(ParsedFile $parsed): ImportResult
     {
         return app(LoteImportService::class)->import($parsed);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function templateDropdowns(): array
+    {
+        return app(ImportTemplateOptions::class)->lotes();
     }
 }

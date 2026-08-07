@@ -76,6 +76,7 @@ class PropietarioImportServiceTest extends TestCase
     public function test_normalizes_rut_with_dots_and_uppercase_dv(): void
     {
         Role::findOrCreate('propietario', 'web');
+        $this->createRegion();
 
         $file = $this->file([
             2 => [
@@ -85,11 +86,11 @@ class PropietarioImportServiceTest extends TestCase
                 'email' => 'juan@correo.cl',
                 'telefono' => null,
                 'direccion' => null,
-                'region' => null,
-                'comuna' => null,
+                'region' => 'Metropolitana de Santiago',
+                'comuna' => 'Santiago',
                 'nacionalidad' => null,
                 'profesion' => null,
-                'estado_civil' => null,
+                'estado_civil' => 'Casado',
             ],
         ]);
 
@@ -110,6 +111,8 @@ class PropietarioImportServiceTest extends TestCase
             'email' => 'viejo@correo.cl',
         ]);
 
+        $this->createRegion();
+
         $file = $this->file([
             2 => [
                 'rut' => '11111111-1',
@@ -118,11 +121,11 @@ class PropietarioImportServiceTest extends TestCase
                 'email' => 'nuevo@correo.cl',
                 'telefono' => null,
                 'direccion' => null,
-                'region' => null,
-                'comuna' => null,
+                'region' => 'Metropolitana de Santiago',
+                'comuna' => 'Santiago',
                 'nacionalidad' => null,
                 'profesion' => null,
-                'estado_civil' => null,
+                'estado_civil' => 'Casado',
             ],
         ]);
 
@@ -154,11 +157,11 @@ class PropietarioImportServiceTest extends TestCase
                 'email' => 'juan@correo.cl',
                 'telefono' => null,
                 'direccion' => null,
-                'region' => null,
-                'comuna' => null,
+                'region' => 'Metropolitana de Santiago',
+                'comuna' => 'Santiago',
                 'nacionalidad' => null,
                 'profesion' => null,
-                'estado_civil' => null,
+                'estado_civil' => 'Casado',
             ],
         ]);
 
@@ -172,6 +175,7 @@ class PropietarioImportServiceTest extends TestCase
     public function test_email_conflict_with_existing_user_is_reported(): void
     {
         User::factory()->create(['email' => 'juan@correo.cl']);
+        $this->createRegion();
 
         $file = $this->file([
             2 => [
@@ -181,11 +185,11 @@ class PropietarioImportServiceTest extends TestCase
                 'email' => 'juan@correo.cl',
                 'telefono' => null,
                 'direccion' => null,
-                'region' => null,
-                'comuna' => null,
+                'region' => 'Metropolitana de Santiago',
+                'comuna' => 'Santiago',
                 'nacionalidad' => null,
                 'profesion' => null,
-                'estado_civil' => null,
+                'estado_civil' => 'Casado',
             ],
         ]);
 
@@ -207,10 +211,10 @@ class PropietarioImportServiceTest extends TestCase
                 'telefono' => null,
                 'direccion' => null,
                 'region' => 'Region Inexistente',
-                'comuna' => null,
+                'comuna' => 'Santiago',
                 'nacionalidad' => null,
                 'profesion' => null,
-                'estado_civil' => null,
+                'estado_civil' => 'Casado',
             ],
         ]);
 
@@ -237,7 +241,7 @@ class PropietarioImportServiceTest extends TestCase
                 'comuna' => 'Providencia',
                 'nacionalidad' => null,
                 'profesion' => null,
-                'estado_civil' => null,
+                'estado_civil' => 'Casado',
             ],
         ]);
 
@@ -267,11 +271,11 @@ class PropietarioImportServiceTest extends TestCase
                 'email' => 'juan@correo.cl',
                 'telefono' => null,
                 'direccion' => null,
-                'region' => null,
-                'comuna' => null,
+                'region' => 'Metropolitana de Santiago',
+                'comuna' => 'Santiago',
                 'nacionalidad' => null,
                 'profesion' => null,
-                'estado_civil' => null,
+                'estado_civil' => 'Casado',
             ],
         ]);
 

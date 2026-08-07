@@ -76,7 +76,7 @@ class CollectionImportServiceTest extends TestCase
         $this->assertSame(50000.0, (float) $collection->unapplied_amount);
     }
 
-    public function test_defaults_metodo_to_efectivo(): void
+    public function test_blank_metodo_is_rejected(): void
     {
         $this->createPropietario();
 
@@ -93,8 +93,10 @@ class CollectionImportServiceTest extends TestCase
 
         $result = app(CollectionImportService::class)->import($file);
 
-        $this->assertSame(1, $result->created);
-        $this->assertSame('efectivo', Collection::query()->first()->collection_method->value);
+        $this->assertSame(0, $result->created);
+        $this->assertSame(1, $result->errorCount());
+        $this->assertSame('metodo', $result->errors[0]['field']);
+        $this->assertDatabaseCount('collections', 0);
     }
 
     public function test_unknown_propietario_is_reported_as_row_error(): void
@@ -104,7 +106,7 @@ class CollectionImportServiceTest extends TestCase
                 'rut_propietario' => '22222222-2',
                 'monto' => '10000',
                 'fecha' => '2026-07-15',
-                'metodo' => null,
+                'metodo' => 'efectivo',
                 'referencia' => null,
                 'notas' => null,
             ],
@@ -134,7 +136,7 @@ class CollectionImportServiceTest extends TestCase
                 'rut_propietario' => '11111111-1',
                 'monto' => '10000',
                 'fecha' => '2026-06-15',
-                'metodo' => null,
+                'metodo' => 'efectivo',
                 'referencia' => null,
                 'notas' => null,
             ],
@@ -142,7 +144,7 @@ class CollectionImportServiceTest extends TestCase
                 'rut_propietario' => '11111111-1',
                 'monto' => '20000',
                 'fecha' => '2026-07-15',
-                'metodo' => null,
+                'metodo' => 'efectivo',
                 'referencia' => null,
                 'notas' => null,
             ],
@@ -166,7 +168,7 @@ class CollectionImportServiceTest extends TestCase
                 'rut_propietario' => '11111111-1',
                 'monto' => '10000',
                 'fecha' => '15/07/2026',
-                'metodo' => null,
+                'metodo' => 'efectivo',
                 'referencia' => null,
                 'notas' => null,
             ],
@@ -189,7 +191,7 @@ class CollectionImportServiceTest extends TestCase
                 'rut_propietario' => '11111111-1',
                 'monto' => '10000',
                 'fecha' => $serial,
-                'metodo' => null,
+                'metodo' => 'efectivo',
                 'referencia' => null,
                 'notas' => null,
             ],
@@ -210,7 +212,7 @@ class CollectionImportServiceTest extends TestCase
                 'rut_propietario' => '11111111-1',
                 'monto' => '10000',
                 'fecha' => 'no-es-fecha',
-                'metodo' => null,
+                'metodo' => 'efectivo',
                 'referencia' => null,
                 'notas' => null,
             ],
@@ -232,7 +234,7 @@ class CollectionImportServiceTest extends TestCase
                 'rut_propietario' => '11111111-1',
                 'monto' => '10000',
                 'fecha' => now()->addMonth()->toDateString(),
-                'metodo' => null,
+                'metodo' => 'efectivo',
                 'referencia' => null,
                 'notas' => null,
             ],
@@ -254,7 +256,7 @@ class CollectionImportServiceTest extends TestCase
                 'rut_propietario' => '11111111-1',
                 'monto' => '0',
                 'fecha' => '2026-07-15',
-                'metodo' => null,
+                'metodo' => 'efectivo',
                 'referencia' => null,
                 'notas' => null,
             ],

@@ -2,7 +2,7 @@
     <x-filament::section>
         <x-slot name="heading">Importaciones</x-slot>
         <x-slot name="description">
-            Importa datos masivos desde archivos CSV o Excel. Cada módulo tiene su propia plantilla descargable y reporta los resultados fila por fila.
+            Importa datos masivos desde archivos CSV o Excel. Cada módulo tiene su propia plantilla descargable.
         </x-slot>
     </x-filament::section>
 

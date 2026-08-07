@@ -41,7 +41,7 @@ final class CollectionImportService
                 'rut_propietario' => ['required', new ValidChileanRut],
                 'monto' => ['required', 'numeric', 'gt:0'],
                 'fecha' => ['required'],
-                'metodo' => ['nullable', Rule::in(array_column(CollectionMethod::cases(), 'value'))],
+                'metodo' => ['required', Rule::in(array_column(CollectionMethod::cases(), 'value'))],
                 'referencia' => ['nullable', 'string', 'max:255'],
                 'notas' => ['nullable', 'string'],
             ], [
@@ -108,7 +108,7 @@ final class CollectionImportService
             'propietario_id' => $propietario->id,
             'amount' => round((float) $data['monto'], 2),
             'collection_date' => $fecha->toDateString(),
-            'collection_method' => ($data['metodo'] ?? null) ?: CollectionMethod::Efectivo->value,
+            'collection_method' => (string) $data['metodo'],
             'reference' => ($data['referencia'] ?? null) ?: null,
             'notes' => ($data['notas'] ?? null) ?: null,
             'created_by' => $createdBy,

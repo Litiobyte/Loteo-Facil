@@ -41,14 +41,15 @@ final class LoteImportService
 
             $validator = Validator::make($data, [
                 'codigo' => ['required', 'string', 'max:255'],
-                'estado' => ['nullable', Rule::in(['disponible', 'reservado', 'vendido'])],
-                'metros_cuadrados' => ['required', 'integer', 'min:0', 'max:2147483647'],
-                'etapa' => ['nullable', 'string', 'max:255'],
-                'valor_lote' => ['nullable', 'integer', 'min:0', 'max:2147483647'],
-                'notas' => ['nullable', 'string'],
+                'estado' => ['required', Rule::in(['disponible', 'reservado', 'vendido'])],
+                'metros_cuadrados' => ['required', 'integer', 'gt:0', 'max:2147483647'],
+                'etapa' => ['required', 'string', 'max:255'],
+                'valor_lote' => ['required', 'integer', 'min:0', 'max:2147483647'],
+                'notas' => ['nullable', 'string', 'max:1000'],
             ], [
                 'required' => 'El campo :attribute es obligatorio.',
                 'integer' => 'El campo :attribute debe ser un número entero.',
+                'gt' => 'El campo :attribute debe ser mayor que 0.',
                 'min' => 'El campo :attribute no puede ser negativo.',
                 'max' => 'El campo :attribute supera el largo máximo.',
                 'in' => 'El campo :attribute tiene un valor no permitido.',
@@ -74,9 +75,9 @@ final class LoteImportService
 
                 $attributes = [
                     'codigo' => trim((string) $data['codigo']),
-                    'estado' => ($data['estado'] ?? null) ?: 'disponible',
+                    'estado' => (string) $data['estado'],
                     'metros_cuadrados' => (int) $data['metros_cuadrados'],
-                    'valor_lote' => ($data['valor_lote'] ?? null) ?: 0,
+                    'valor_lote' => (int) $data['valor_lote'],
                     'notas' => ($data['notas'] ?? null) ?: null,
                     'etapa_id' => $etapaId,
                 ];

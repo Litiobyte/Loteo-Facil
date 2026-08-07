@@ -129,8 +129,16 @@ trait ManagesImport
         $filename = static::templateFilename();
 
         return $format === 'xlsx'
-            ? TemplateGenerator::xlsx(static::templateHeaders(), static::templateExample(), $filename)
+            ? TemplateGenerator::xlsx(static::templateHeaders(), static::templateExample(), $filename, $this->templateDropdowns())
             : TemplateGenerator::csv(static::templateHeaders(), static::templateExample(), $filename);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function templateDropdowns(): array
+    {
+        return [];
     }
 
     /**
