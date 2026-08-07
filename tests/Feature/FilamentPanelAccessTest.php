@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Owner\Resources\Users\UserResource;
 use App\Models\User;
 use Filament\PanelRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -66,7 +67,7 @@ class FilamentPanelAccessTest extends TestCase
 
         $this->actingAs($ownerA);
 
-        $query = \App\Filament\Owner\Resources\Users\UserResource::getEloquentQuery();
+        $query = UserResource::getEloquentQuery();
 
         $ids = $query->pluck('id')->all();
 
