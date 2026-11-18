@@ -4,10 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Owner\Auth\ChangePassword;
 use App\Filament\Owner\Auth\Login;
-use App\Filament\Owner\Widgets\FinancialSummaryWidget;
-use App\Filament\Owner\Widgets\NextCollectionEstimateWidget;
-use App\Filament\Owner\Widgets\OverdueAlertsWidget;
-use App\Filament\Owner\Widgets\WelcomeWidget;
+use App\Filament\Owner\Pages\Dashboard;
 use App\Http\Middleware\RequireOwnerPasswordChange;
 use App\Models\CommunitySetting;
 use Filament\Http\Middleware\Authenticate;
@@ -15,7 +12,6 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -64,12 +60,6 @@ class OwnerPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Owner/Pages'), for: 'App\Filament\Owner\Pages')
             ->pages([
                 Dashboard::class,
-            ])
-            ->widgets([
-                WelcomeWidget::class,
-                OverdueAlertsWidget::class,
-                FinancialSummaryWidget::class,
-                NextCollectionEstimateWidget::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make('Finanzas')
