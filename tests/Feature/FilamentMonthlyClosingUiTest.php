@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Accounting\Services\MonthlyClosingService;
+use Closure;
 use App\Filament\Admin\Resources\AccountingPeriods\AccountingPeriodResource;
 use App\Filament\Admin\Resources\AccountingPeriods\Pages\CreateAccountingPeriod;
 use App\Filament\Admin\Resources\AccountingPeriods\Pages\EditAccountingPeriod;
@@ -149,14 +150,25 @@ class FilamentMonthlyClosingUiTest extends TestCase
 
         Livewire::test(CreateAccountingPeriod::class)
             ->fillForm(['year' => 2025, 'month' => 2])
-            ->assertSet('data.period_start', '2025-02-01')
-            ->assertSet('data.period_end', '2025-02-28')
+            // El estado interno del DatePicker no nativo es 'Y-m-d H:i:s' (la hora
+            // proviene del reloj actual al normalizar), por eso se compara la fecha.
+            ->assertSet('data.period_start', $this->dateStartsWith('2025-02-01'))
+            ->assertSet('data.period_end', $this->dateStartsWith('2025-02-28'))
             ->fillForm(['month' => 11])
-            ->assertSet('data.period_start', '2025-11-01')
-            ->assertSet('data.period_end', '2025-11-30')
+            ->assertSet('data.period_start', $this->dateStartsWith('2025-11-01'))
+            ->assertSet('data.period_end', $this->dateStartsWith('2025-11-30'))
             // Las fechas siguen siendo editables manualmente.
             ->fillForm(['period_start' => '2025-11-05'])
-            ->assertSet('data.period_start', '2025-11-05');
+            ->assertSet('data.period_start', $this->dateStartsWith('2025-11-05'));
+    }
+
+    /**
+     * assertSet acepta un callable; Filament normaliza el estado interno de los
+     * DatePicker no nativos a 'Y-m-d H:i:s', así que comparamos solo la fecha.
+     */
+    private function dateStartsWith(string $date): Closure
+    {
+        return static fn (string $state): bool => str_starts_with($state, $date);
     }
 
     public function test_create_period_rejects_future_months_and_years(): void
