@@ -10,6 +10,7 @@ use App\Domain\Collections\Services\CollectionApplicationService;
 use App\Models\AccountingPeriod;
 use App\Models\Collection;
 use App\Models\CollectionAllocation;
+use App\Models\Expense;
 use App\Models\PartnerCharge;
 use App\Models\Propietario;
 use App\Models\User;
@@ -55,6 +56,7 @@ class MonthlyClosingServiceTest extends TestCase
 
         PartnerCharge::factory()->create([
             'propietario_id' => $this->propietario->id,
+            'expense_id' => Expense::factory()->distributed()->create(['expense_date' => '2026-08-01', 'due_date' => '2026-08-03'])->id,
             'amount' => 120000,
             'paid_amount' => 0,
             'remaining_amount' => 120000,
@@ -81,7 +83,7 @@ class MonthlyClosingServiceTest extends TestCase
         $this->assertNotNull($closed->close_folio);
         $this->assertMatchesRegularExpression('/^CIERRE-\d{6}-\d{4}$/', (string) $closed->close_folio);
         $this->assertNotNull($closed->snapshot);
-        $this->assertEquals(120000.0, (float) $closed->snapshot->total_charges);
+        $this->assertEquals(240000.0, (float) $closed->snapshot->total_charges);
         $this->assertEquals(60000.0, (float) $closed->snapshot->total_collections);
     }
 
@@ -95,6 +97,10 @@ class MonthlyClosingServiceTest extends TestCase
 
         $charge = PartnerCharge::factory()->create([
             'propietario_id' => $this->propietario->id,
+            'expense_id' => Expense::factory()->distributed()->create([
+                'expense_date' => $previousMonth->copy()->startOfMonth(),
+                'due_date' => $previousMonth,
+            ])->id,
             'amount' => 100000,
             'paid_amount' => 0,
             'remaining_amount' => 100000,
@@ -182,6 +188,10 @@ class MonthlyClosingServiceTest extends TestCase
         PartnerCharge::factory()->create([
             'propietario_id' => $this->propietario->id,
             'amount' => 20000,
+            'expense_id' => Expense::factory()->distributed()->create([
+                'expense_date' => $targetDate->copy()->startOfMonth(),
+                'due_date' => $targetDate,
+            ])->id,
             'paid_amount' => 0,
             'remaining_amount' => 20000,
             'status' => ChargeStatus::Pending,
@@ -214,6 +224,31 @@ class MonthlyClosingServiceTest extends TestCase
         $this->assertStringContainsString((string) $period->close_folio, $content);
         $this->assertStringContainsString('Cobro emitido', $content);
         $this->assertStringContainsString('Recaudacion recibido', $content);
+    }
+
+    public function test_export_consolidation_is_informational_without_duplicate_debit(): void
+    {
+        $expense = Expense::factory()->distributed()->create(['expense_date' => '2026-10-01', 'due_date' => '2026-10-05']);
+        $source = PartnerCharge::factory()->create([
+            'propietario_id' => $this->propietario->id,
+            'expense_id' => $expense->id,
+            'amount' => 1000,
+            'paid_amount' => 0,
+            'due_date' => '2026-10-05',
+            'created_at' => '2026-10-01',
+        ]);
+        $closed = $this->service->closePeriod(2026, 10, $this->user->id);
+        ob_start();
+        $this->service->exportClosedPeriodCsv($closed)->sendContent();
+        $content = (string) ob_get_clean();
+        $rows = array_map(fn (string $line): array => str_getcsv($line), array_filter(explode("\n", trim($content))));
+        $informational = collect($rows)->first(fn (array $row): bool => ($row[2] ?? '') === 'Consolidación de saldo');
+        $original = collect($rows)->first(fn (array $row): bool => ($row[2] ?? '') === 'Cobro emitido');
+        $this->assertNotNull($informational);
+        $this->assertStringContainsString('Origen #'.$source->id.': 1000', $informational[5]);
+        $this->assertEquals(0, (float) $informational[6]);
+        $this->assertEquals(1000, (float) $original[6]);
+        $this->assertSame('1000.00', $source->fresh()->amount);
     }
 
     /**

@@ -33,19 +33,20 @@ This file defines how to use project agents and skills consistently across openc
 ## Cost Profile
 
 - High:
-  - `laravel-architect`: `github-copilot/gpt-5.3-codex`
-  - `financial-logic-specialist`: `github-copilot/gpt-5.3-codex`
+  - `laravel-architect`: `openai/gpt-6.1-terra` — homólogo: `opencode-go/deepseek-v4-pro`
+  - `financial-logic-specialist`: `openai/gpt-6.1-terra` — homólogo: `opencode-go/deepseek-v4-pro`
 - Medium-high:
-  - `filament-developer`: `github-copilot/gpt-5.3-codex`
+  - `filament-developer`: `openai/gpt-6.1-sol` — homólogo: `opencode-go/kimi-k3.1-pro`
 - Low/medium:
-  - `financial-qa`: `openai/gpt-4.1-mini`
-  - `code-reviewer`: `openai/gpt-4.1-mini`
+  - `financial-qa`: `opencode-go/kimi-k2.7-code`
+  - `code-reviewer`: `openai/gpt-6.1-sol` — homólogo: `opencode-go/kimi-k3.1-pro`
 - Low:
-  - `technical-documenter`: `openai/gpt-4.1-mini`
+  - `technical-documenter`: `google/gemini-3.5-flash-lite` — homólogo: `opencode-go/glm-5.3-flash`
 
 Fallback policy:
-1. `openai/gpt-4.1-mini` -> `google/gemini-2.0-flash` when quality is insufficient.
-2. Escalate temporarily to `github-copilot/gpt-5.3-codex` for difficult cases.
+1. Si OpenAI no está disponible, cada subagente usa su homólogo de OpenCode Go declarado arriba; no cambies de agente ni amplíes el plan por ello.
+2. Los subagentes trabajan directo por defecto: plan breve, sin lanzar otros subagentes.
+3. Escala documentación o QA a `openai/gpt-6.1-sol` cuando la calidad sea insuficiente; usa `openai/gpt-6.1-terra` solo para decisiones difíciles de arquitectura o integridad financiera.
 
 ## Skills Directory
 

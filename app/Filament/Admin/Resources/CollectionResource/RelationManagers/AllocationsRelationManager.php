@@ -88,9 +88,9 @@ class AllocationsRelationManager extends RelationManager
                 ->color('gray')
                 ->tooltip(fn (): string => sprintf(
                     'Total: %s | Aplicado: %s | No aplicado: %s',
-                    number_format((float) $this->ownerRecord->amount, 2, ',', '.').' CLP',
-                    number_format((float) $this->ownerRecord->applied_amount, 2, ',', '.').' CLP',
-                    number_format((float) $this->ownerRecord->unapplied_amount, 2, ',', '.').' CLP',
+                    '$'.number_format((float) $this->ownerRecord->amount, 0, ',', '.'),
+                    '$'.number_format((float) $this->ownerRecord->applied_amount, 0, ',', '.'),
+                    '$'.number_format((float) $this->ownerRecord->unapplied_amount, 0, ',', '.'),
                 )),
         ];
     }

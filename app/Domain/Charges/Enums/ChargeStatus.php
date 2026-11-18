@@ -8,4 +8,5 @@ enum ChargeStatus: string
     case Partial = 'partial';
     case Paid = 'paid';
     case Cancelled = 'cancelled';
+    case Consolidated = 'consolidated';
 }

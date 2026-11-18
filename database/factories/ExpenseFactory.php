@@ -21,7 +21,8 @@ class ExpenseFactory extends Factory
      */
     public function definition(): array
     {
-        $expenseDate = fake()->dateTimeBetween('-10 months', 'now');
+        // Usar now() para respetar Carbon::setTestNow en pruebas
+        $expenseDate = fake()->dateTimeBetween('-10 months', now());
         $dueDate = fake()->boolean(70)
             ? fake()->dateTimeBetween($expenseDate, '+90 days')
             : null;

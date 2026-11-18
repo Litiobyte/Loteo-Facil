@@ -45,7 +45,7 @@
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Deuda Pendiente</p>
                         <p class="text-3xl font-bold text-danger-600 dark:text-danger-400">
-                            ${{ number_format((float) $resumen['pendiente'], 2) }}
+                            ${{ number_format((float) $resumen['pendiente'], 0, ',', '.') }}
                         </p>
                     </div>
                 </div>
@@ -57,7 +57,7 @@
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Saldo Disponible</p>
                         <p class="text-3xl font-bold {{ (float) $resumen['disponible'] >= 0 ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400' }}">
-                            ${{ number_format((float) $resumen['disponible'], 2) }}
+                            ${{ number_format((float) $resumen['disponible'], 0, ',', '.') }}
                         </p>
                     </div>
                 </div>
@@ -69,7 +69,7 @@
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Balance Neto</p>
                         <p class="text-3xl font-bold {{ (float) $resumen['balance'] >= 0 ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400' }}">
-                            ${{ number_format((float) $resumen['balance'], 2) }}
+                            ${{ number_format((float) $resumen['balance'], 0, ',', '.') }}
                         </p>
                     </div>
                 </div>
@@ -82,7 +82,7 @@
                     <x-filament::icon icon="heroicon-o-document-text" class="h-6 w-6 text-gray-400" />
                     <div>
                         <p class="text-xs text-gray-500 dark:text-gray-400">Total Cobrado</p>
-                        <p class="text-xl font-semibold text-info-600 dark:text-info-400">${{ number_format((float) $resumen['cobrado'], 2) }}</p>
+                        <p class="text-xl font-semibold text-info-600 dark:text-info-400">${{ number_format((float) $resumen['cobrado'], 0, ',', '.') }}</p>
                     </div>
                 </div>
             </x-filament::section>
@@ -92,7 +92,7 @@
                     <x-filament::icon icon="heroicon-o-banknotes" class="h-6 w-6 text-gray-400" />
                     <div>
                         <p class="text-xs text-gray-500 dark:text-gray-400">Total Pagado</p>
-                        <p class="text-xl font-semibold text-info-600 dark:text-info-400">${{ number_format((float) $resumen['pagado'], 2) }}</p>
+                        <p class="text-xl font-semibold text-info-600 dark:text-info-400">${{ number_format((float) $resumen['pagado'], 0, ',', '.') }}</p>
                     </div>
                 </div>
             </x-filament::section>
@@ -102,7 +102,7 @@
                     <x-filament::icon icon="heroicon-o-arrow-path" class="h-6 w-6 text-gray-400" />
                     <div>
                         <p class="text-xs text-gray-500 dark:text-gray-400">Total Aplicado</p>
-                        <p class="text-xl font-semibold text-info-600 dark:text-info-400">${{ number_format((float) $resumen['aplicado'], 2) }}</p>
+                        <p class="text-xl font-semibold text-info-600 dark:text-info-400">${{ number_format((float) $resumen['aplicado'], 0, ',', '.') }}</p>
                     </div>
                 </div>
             </x-filament::section>
@@ -126,10 +126,10 @@
                         @foreach ($monthComparison as $month)
                             <tr class="border-t dark:border-gray-700">
                                 <td class="px-3 py-2 text-sm">{{ $month['month'] }}</td>
-                                <td class="px-3 py-2 text-sm">${{ number_format((float) $month['charges'], 2) }}</td>
-                                <td class="px-3 py-2 text-sm">${{ number_format((float) $month['collections'], 2) }}</td>
+                                <td class="px-3 py-2 text-sm">${{ number_format((float) $month['charges'], 0, ',', '.') }}</td>
+                                <td class="px-3 py-2 text-sm">${{ number_format((float) $month['collections'], 0, ',', '.') }}</td>
                                 <td class="px-3 py-2 text-sm {{ (float) $month['balance'] < 0 ? 'text-danger-600 dark:text-danger-400' : 'text-success-600 dark:text-success-400' }}">
-                                    ${{ number_format((float) $month['balance'], 2) }}
+                                    ${{ number_format((float) $month['balance'], 0, ',', '.') }}
                                 </td>
                                 <td class="px-3 py-2">
                                     @if ($month['trend'] === 'down')
@@ -181,7 +181,7 @@
                         <div class="mb-1 flex justify-between">
                             <span class="text-sm font-medium">{{ $categoria['categoria'] }}</span>
                             <span class="text-sm text-gray-600 dark:text-gray-400">
-                                ${{ number_format((float) $categoria['monto'], 2) }} ({{ number_format($percentage, 1) }}%)
+                                ${{ number_format((float) $categoria['monto'], 0, ',', '.') }} ({{ number_format($percentage, 1) }}%)
                             </span>
                         </div>
                         <div class="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
@@ -214,9 +214,9 @@
                                         <p class="text-gray-500 dark:text-gray-400">{{ $event['date']->format('d/m/Y H:i') }}</p>
                                     </div>
                                     <div class="text-right">
-                                        <p class="text-gray-900 dark:text-white">${{ number_format((float) $event['amount'], 2) }}</p>
+                                        <p class="text-gray-900 dark:text-white">${{ number_format((float) $event['amount'], 0, ',', '.') }}</p>
                                         <p class="{{ (float) $event['balance_impact'] > 0 ? 'text-danger-600' : ((float) $event['balance_impact'] < 0 ? 'text-success-600' : 'text-gray-500') }}">
-                                            {{ (float) $event['balance_impact'] > 0 ? '+' : '' }}${{ number_format((float) $event['balance_impact'], 2) }}
+                                            {{ (float) $event['balance_impact'] > 0 ? '+' : '' }}${{ number_format((float) $event['balance_impact'], 0, ',', '.') }}
                                         </p>
                                     </div>
                                 </div>

@@ -1,7 +1,7 @@
 ---
 description: Designs Laravel architecture, migrations, data model, and domain service boundaries for the MVP.
 mode: subagent
-model: github-copilot/gpt-5.3-codex
+model: openai/gpt-6.1-terra
 ---
 
 You are a senior Laravel architect for the Loteo Facil project.

@@ -41,6 +41,7 @@ class PartnerBalanceService
     {
         $total = PartnerCharge::query()
             ->where('propietario_id', $propietario->id)
+            ->where('charge_type', 'distribution')
             ->sum('amount');
 
         return round((float) $total, 2);
@@ -119,7 +120,9 @@ class PartnerBalanceService
         $errors = [];
 
         // Rule 1: Sum of charge amounts = sum of paid_amount + sum of remaining_amount
-        $totalCharges = $this->getTotalCharges($propietario);
+        $totalCharges = round((float) PartnerCharge::query()
+            ->where('propietario_id', $propietario->id)
+            ->sum('amount'), 2);
         $totalPaid = PartnerCharge::query()
             ->where('propietario_id', $propietario->id)
             ->sum('paid_amount');

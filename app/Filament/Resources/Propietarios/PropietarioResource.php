@@ -7,11 +7,16 @@ use App\Filament\Resources\Propietarios\Pages\CreatePropietario;
 use App\Filament\Resources\Propietarios\Pages\EditPropietario;
 use App\Filament\Resources\Propietarios\Pages\ListPropietarios;
 use App\Filament\Resources\Propietarios\RelationManagers\LotesRelationManager;
+use App\Filament\Resources\Propietarios\RelationManagers\ShareContributionsRelationManager;
+use App\Filament\Resources\Propietarios\RelationManagers\ShareHoldingsRelationManager;
+use App\Models\CommunitySetting;
 use App\Models\Comuna;
 use App\Models\Propietario;
 use App\Models\Region;
 use App\Models\User;
 use App\Rules\ValidChileanRut;
+use App\Support\AdminTableColumns;
+use App\Support\ChileanNumber;
 use App\Support\ChileanRut;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
@@ -24,6 +29,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -116,13 +122,7 @@ class PropietarioResource extends Resource
                     ->maxLength(120),
                 Select::make('estado_civil')
                     ->label('Estado civil')
-                    ->options([
-                        'Soltero' => 'Soltero',
-                        'Casado' => 'Casado',
-                        'Divorciado' => 'Divorciado',
-                        'Viudo' => 'Viudo',
-                        'Union civil' => 'Union civil',
-                    ])
+                    ->options(static::maritalStatusOptions())
                     ->required(),
                 TextInput::make('email')
                     ->label('Email')
@@ -131,6 +131,18 @@ class PropietarioResource extends Resource
                     ->maxLength(255)
                     ->unique(ignoreRecord: true),
             ]);
+    }
+
+    /** @return array<string, string> */
+    public static function maritalStatusOptions(): array
+    {
+        return [
+            'Soltero' => 'Soltero',
+            'Casado' => 'Casado',
+            'Divorciado' => 'Divorciado',
+            'Viudo' => 'Viudo',
+            'Union civil' => 'Union civil',
+        ];
     }
 
     public static function eligibleUsersQuery(Builder $query): Builder
@@ -146,27 +158,47 @@ class PropietarioResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
+            ->columns(AdminTableColumns::contentSized([
+                TextColumn::make('share_quantity')->label('Acciones vigentes')
+                    ->toggleable()
+                    ->visible(fn (): bool => CommunitySetting::current()->usesShares())
+                    ->state(fn (Propietario $record): string => $record->shareTotals()['quantity']),
+                TextColumn::make('share_area')->label('Superficie equivalente m²')
+                    ->toggleable()
+                    ->visible(fn (): bool => CommunitySetting::current()->usesShares())
+                    ->state(fn (Propietario $record): string => $record->shareTotals()['square_meters'])
+                    ->formatStateUsing(fn (mixed $state): ?string => ChileanNumber::format($state)),
                 TextColumn::make('nombre_completo')
                     ->label('Nombre')
-                    ->searchable(),
+                    ->sortable(['nombre', 'apellido'])
+                    ->searchable(['nombre', 'apellido']),
                 TextColumn::make('rut')
                     ->label('RUT')
+                    ->sortable()
                     ->searchable(),
                 TextColumn::make('email')
                     ->label('Email')
+                    ->sortable()
                     ->searchable(),
                 TextColumn::make('lotes_asignados_count')
+                    ->toggleable()
+                    ->visible(fn (): bool => CommunitySetting::current()->usesLots())
                     ->label('N lotes asignados')
                     ->badge()
                     ->sortable(),
                 TextColumn::make('lotes_activos_m2_sum')
+                    ->toggleable()
+                    ->visible(fn (): bool => CommunitySetting::current()->usesLots())
                     ->label('Hectareas totales')
                     ->formatStateUsing(fn ($state): string => number_format(((float) ($state ?? 0)) / 10000, 2, ',', '.').' ha')
                     ->sortable(),
-            ])
+            ]))
             ->filters([
-                //
+                SelectFilter::make('region')
+                    ->label('Region')
+                    ->relationship('region', 'nombre')
+                    ->searchable()
+                    ->preload(),
             ])
             ->recordActions([
                 EditAction::make(),
@@ -186,7 +218,7 @@ class PropietarioResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user'])
+            ->with(['user', 'shareHoldings', 'shareContributions'])
             ->withCount([
                 'lotesActivos as lotes_asignados_count' => fn (Builder $query): Builder => $query
                     ->whereIn('estado', ['reservado', 'vendido']),
@@ -201,6 +233,8 @@ class PropietarioResource extends Resource
     {
         return [
             LotesRelationManager::class,
+            ShareHoldingsRelationManager::class,
+            ShareContributionsRelationManager::class,
         ];
     }
 

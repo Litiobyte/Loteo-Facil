@@ -4,6 +4,7 @@ namespace App\Domain\Expenses\Services;
 
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Domain\Expenses\Enums\ExpenseStatus;
+use App\Models\CommunitySetting;
 use App\Models\Expense;
 use App\Models\PartnerCharge;
 use DomainException;
@@ -25,17 +26,18 @@ class ChargeGenerationService
      */
     public function generateChargesFromExpense(Expense $expense): Collection
     {
-        if ($expense->status !== ExpenseStatus::Registered) {
-            throw new DomainException('Solo se puede generar cobros para un gasto en estado registrado.');
-        }
-
-        // Verificar si ya existen cobros para este gasto (idempotencia)
-        $existingCharges = PartnerCharge::byExpense($expense->id)->count();
-        if ($existingCharges > 0) {
-            throw new DomainException('Este gasto ya tiene cobros generados.');
-        }
-
         return DB::transaction(function () use ($expense): Collection {
+            $expense = Expense::query()->lockForUpdate()->findOrFail($expense->getKey());
+            CommunitySetting::query()->lockForUpdate()->findOrFail(1);
+
+            if ($expense->status !== ExpenseStatus::Registered) {
+                throw new DomainException('Solo se puede generar cobros para un gasto en estado registrado.');
+            }
+
+            if (PartnerCharge::byExpense($expense->id)->exists()) {
+                throw new DomainException('Este gasto ya tiene cobros generados.');
+            }
+
             // Calcular distribución
             $distribution = $this->distributionService->calculateDistribution($expense);
 
@@ -60,6 +62,7 @@ class ChargeGenerationService
                     'total_hectares_at_moment' => $row['total_hectares_at_moment'],
                     'percentage_applied' => $row['percentage_applied'],
                     'calculation_notes' => $row['calculation_notes'],
+                    'distribution_snapshot' => $row['distribution_snapshot'] ?? null,
                 ]);
 
                 $charges->push($charge);

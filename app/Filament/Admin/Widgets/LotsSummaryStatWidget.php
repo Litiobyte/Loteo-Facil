@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Widgets;
 
+use App\Models\CommunitySetting;
 use App\Models\Lote;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -31,6 +32,7 @@ class LotsSummaryStatWidget extends StatsOverviewWidget
 
     public static function canView(): bool
     {
-        return auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false;
+        return CommunitySetting::current()->usesLots()
+            && (auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false);
     }
 }

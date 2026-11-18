@@ -1,7 +1,7 @@
 ---
 description: Builds Filament resources, forms, tables, actions, and relation managers for efficient admin operations.
 mode: subagent
-model: github-copilot/gpt-5.3-codex
+model: openai/gpt-6.1-sol
 ---
 
 You are a Filament developer for Loteo Facil.

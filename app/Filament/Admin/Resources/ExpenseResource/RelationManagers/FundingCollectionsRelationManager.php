@@ -5,6 +5,7 @@ namespace App\Filament\Admin\Resources\ExpenseResource\RelationManagers;
 use App\Domain\Balances\Services\CashBalanceService;
 use App\Domain\Expenses\Enums\ExpenseStatus;
 use App\Domain\Expenses\Services\ExpenseFundingPaymentService;
+use App\Filament\Forms\ChileanNumberInput;
 use App\Models\ExpenseFundingPayment;
 use DomainException;
 use Filament\Actions\Action;
@@ -14,7 +15,6 @@ use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\IconColumn;
@@ -84,14 +84,11 @@ class FundingCollectionsRelationManager extends RelationManager
                             ->displayFormat('d/m/Y')
                             ->default(now()->toDateString())
                             ->maxDate(now()),
-                        TextInput::make('amount')
+                        ChileanNumberInput::make('amount')
                             ->label('Monto egreso')
                             ->required()
-                            ->numeric()
                             ->minValue(0.01)
-                            ->step(0.01)
-                            ->prefix('$')
-                            ->suffix('CLP'),
+                            ->prefix('$'),
                         Textarea::make('notes')
                             ->label('Notas')
                             ->rows(2),
@@ -106,10 +103,10 @@ class FundingCollectionsRelationManager extends RelationManager
                                 }
 
                                 if ($projectedCash < 0) {
-                                    return 'ALERTA: La caja proyectada quedará negativa en $'.number_format(abs($projectedCash), 0, ',', '.').' CLP.';
+                                    return 'ALERTA: La caja proyectada quedará negativa en $'.number_format(abs($projectedCash), 0, ',', '.').'.';
                                 }
 
-                                return 'Caja proyectada después del egreso: $'.number_format($projectedCash, 0, ',', '.').' CLP.';
+                                return 'Caja proyectada después del egreso: $'.number_format($projectedCash, 0, ',', '.').'.';
                             }),
                         Checkbox::make('confirm_negative_cash')
                             ->label('Estoy seguro de continuar aunque la caja quede negativa')
@@ -154,14 +151,11 @@ class FundingCollectionsRelationManager extends RelationManager
                             ->native(false)
                             ->displayFormat('d/m/Y')
                             ->maxDate(now()),
-                        TextInput::make('amount')
+                        ChileanNumberInput::make('amount')
                             ->label('Monto egreso')
                             ->required()
-                            ->numeric()
                             ->minValue(0.01)
-                            ->step(0.01)
-                            ->prefix('$')
-                            ->suffix('CLP'),
+                            ->prefix('$'),
                         Textarea::make('notes')
                             ->label('Notas')
                             ->rows(2),
@@ -176,10 +170,10 @@ class FundingCollectionsRelationManager extends RelationManager
                                 }
 
                                 if ($projectedCash < 0) {
-                                    return 'ALERTA: La caja proyectada quedará negativa en $'.number_format(abs($projectedCash), 0, ',', '.').' CLP.';
+                                    return 'ALERTA: La caja proyectada quedará negativa en $'.number_format(abs($projectedCash), 0, ',', '.').'.';
                                 }
 
-                                return 'Caja proyectada después del egreso: $'.number_format($projectedCash, 0, ',', '.').' CLP.';
+                                return 'Caja proyectada después del egreso: $'.number_format($projectedCash, 0, ',', '.').'.';
                             }),
                         Checkbox::make('confirm_negative_cash')
                             ->label('Estoy seguro de continuar aunque la caja quede negativa')

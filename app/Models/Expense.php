@@ -32,6 +32,9 @@ use Illuminate\Validation\ValidationException;
  * @property Carbon|null $paid_at
  * @property int|null $created_by
  * @property string|null $notes
+ * @property bool $is_recurring
+ * @property Carbon|null $recurrence_end_date
+ * @property int|null $parent_expense_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -44,6 +47,7 @@ class Expense extends Model
     protected $attributes = [
         'status' => ExpenseStatus::Registered,
         'funded_amount' => 0,
+        'is_recurring' => false,
     ];
 
     /** @var list<string> */
@@ -61,6 +65,9 @@ class Expense extends Model
         'paid_at',
         'created_by',
         'notes',
+        'is_recurring',
+        'recurrence_end_date',
+        'parent_expense_id',
     ];
 
     /**
@@ -77,9 +84,14 @@ class Expense extends Model
             'funded_amount' => 'decimal:2',
             'distributed_at' => 'datetime',
             'paid_at' => 'datetime',
+            'is_recurring' => 'boolean',
+            'recurrence_end_date' => 'date',
         ];
     }
 
+    /**
+     * Las fechas futuras solo se permiten en instancias con una cabeza asociada.
+     */
     protected static function booted(): void
     {
         static::saving(function (self $expense): void {
@@ -88,7 +100,7 @@ class Expense extends Model
                 'title' => ['required', 'string', 'max:200'],
                 'description' => ['nullable', 'string', 'max:500'],
                 'amount' => ['required', 'numeric', 'gt:0'],
-                'expense_date' => ['required', 'date', 'before_or_equal:today'],
+                'expense_date' => array_filter(['required', 'date', $expense->parent_expense_id === null ? 'before_or_equal:today' : null]),
                 'due_date' => ['nullable', 'date', 'after_or_equal:expense_date'],
                 'distribution_type' => [
                     'required',
@@ -103,6 +115,9 @@ class Expense extends Model
                 'paid_at' => ['nullable', 'date'],
                 'created_by' => ['nullable', 'exists:users,id'],
                 'notes' => ['nullable', 'string'],
+                'is_recurring' => ['boolean'],
+                'recurrence_end_date' => ['nullable', 'date'],
+                'parent_expense_id' => ['nullable', 'exists:expenses,id'],
             ]);
 
             if ($validator->fails()) {
@@ -190,6 +205,11 @@ class Expense extends Model
     public function charges(): HasMany
     {
         return $this->hasMany(PartnerCharge::class);
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_expense_id');
     }
 
     public function fundingCollections(): HasMany

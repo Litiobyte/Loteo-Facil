@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Crear cierre contable · Loteo Fácil</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f8fafc;font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button{cursor:pointer}.wrap{max-width:1380px;margin:0 auto;padding:36px 30px 60px}.breadcrumb{color:#64748b;font-size:13px;margin-bottom:18px}.breadcrumb span{padding:0 12px;color:#94a3b8}.heading{display:flex;gap:17px;align-items:center;margin-bottom:34px}.heading-icon{width:66px;height:66px;border-radius:17px;background:#e8f6ed;display:grid;place-items:center;color:#18823e}.heading svg{width:31px;height:31px}h1{font-size:30px;letter-spacing:-.9px;margin:0 0 4px;font-weight:750}.lead{color:#64748b;margin:0;font-size:15px}.layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px, .9fr);gap:23px;align-items:start}.card{background:white;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 4px 18px rgba(15,23,42,.035);overflow:hidden}.section-heading{padding:23px 26px;border-bottom:1px solid #edf0f4;display:flex;gap:14px;align-items:center}.section-heading .ico{font-size:24px}.section-heading h2{font-size:19px;margin:0 0 3px}.section-heading p{font-size:14px;color:#64748b;margin:0}.fields{padding:26px;display:grid;grid-template-columns:1fr 1fr;gap:25px 23px}.field label{display:block;font-size:14px;font-weight:650;margin-bottom:9px}.req{color:#dc2626}.control{width:100%;height:45px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;padding:0 13px;outline:none;color:#1f2937}.control:focus{border-color:#159447;box-shadow:0 0 0 3px #15803d20}.hint{font-size:12px;color:#64748b;margin:6px 0 0}.aside{display:grid;gap:18px}.info{background:#edf8f0;border:1px solid #d9eee0;border-radius:16px;padding:25px}.info h3,.validation h3{font-size:18px;margin:0 0 12px}.info h3{display:flex;align-items:center;gap:10px}.info p{margin:0;font-size:14px;line-height:1.7;color:#40516b}.circ{display:inline-grid;place-items:center;border:2px solid #15803d;border-radius:50%;width:26px;height:26px;color:#15803d;font-weight:750}.validation{padding:25px}.validation h3{margin-bottom:18px}.validation ul{padding:0;margin:0;list-style:none;display:grid;gap:15px}.validation li{display:flex;gap:11px;align-items:flex-start;font-size:14px;line-height:1.5;color:#475569}.check{background:#16833c;color:white;border-radius:50%;width:21px;height:21px;flex:0 0 21px;display:grid;place-items:center;font-size:13px;font-weight:bold}.actions{margin-top:22px;background:white;border:1px solid #e2e8f0;box-shadow:0 4px 18px rgba(15,23,42,.035);border-radius:14px;padding:17px 22px;display:flex;justify-content:space-between;gap:10px;align-items:center}.right{display:flex;gap:10px}.btn{border:1px solid #cbd5e1;border-radius:9px;background:white;padding:12px 17px;font-weight:650;color:#172033}.btn:hover{background:#f8fafc}.primary{border-color:#138338;background:#15803d;color:white}.primary:hover{background:#116b30}.notice{margin-top:16px;border-radius:10px;padding:12px 16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:14px;display:none}.notice.show{display:block}.notice.error{background:#fef2f2;border-color:#fecaca;color:#991b1b}@media(max-width:900px){.layout{grid-template-columns:1fr}}@media(max-width:600px){.wrap{padding:22px 16px}.fields{grid-template-columns:1fr;padding:19px;gap:17px}.heading{gap:12px}.heading-icon{width:48px;height:48px}h1{font-size:24px}.actions{flex-wrap:wrap}.right{width:100%;display:grid;grid-template-columns:1fr 1fr}.right .btn{padding:11px 9px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+ <div class="breadcrumb">Cierres Contables <span>›</span> Crear</div>
+ <header class="heading">
+  <div class="heading-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h2m4 0h2M8 15h2m4 0h2M8 19h2m4 0h2"/></svg></div>
+  <div><h1>Crear cierre contable</h1><p class="lead">Define el período, estado y folio del cierre contable.</p></div>
+ </header>
+ <form id="cierreForm" novalidate>
+ <div class="layout">
+  <section class="card">
+   <div class="section-heading"><span class="ico">▦</span><div><h2>Información del cierre</h2><p>Completa los datos del período contable.</p></div></div>
+   <div class="fields">
+    <div class="field"><label for="year">Año <span class="req">*</span></label><select class="control" id="year" required></select></div>
+    <div class="field"><label for="month">Mes <span class="req">*</span></label><select class="control" id="month" required></select></div>
+    <div class="field"><label for="start">Inicio de período <span class="req">*</span></label><input class="control" type="date" id="start" required /></div>
+    <div class="field"><label for="end">Fin de período <span class="req">*</span></label><input class="control" type="date" id="end" required /></div>
+    <div class="field"><label for="status">Estado</label><select class="control" id="status"><option value="abierto">🟢 Abierto</option><option value="cerrado">🔒 Cerrado</option></select></div>
+    <div class="field"><label for="folio">Folio de cierre</label><input class="control" id="folio" placeholder="Ej: CC-2026-11" maxlength="60" /><p class="hint">Opcional. Debe ser único si se informa.</p></div>
+   </div>
+  </section>
+  <aside class="aside">
+   <section class="info"><h3><span class="circ">i</span> ¿Qué es un cierre contable?</h3><p>Permite consolidar y bloquear la información financiera de un período (mes o año), evitando modificaciones posteriores.</p></section>
+   <section class="card validation"><h3>✓ &nbsp;Validaciones</h3><ul><li><span class="check">✓</span>El período debe estar dentro del año seleccionado.</li><li><span class="check">✓</span>La fecha de inicio no puede ser mayor que la de fin.</li><li><span class="check">✓</span>El folio de cierre debe ser único (si se ingresa).</li></ul></section>
+  </aside>
+ </div>
+ <div class="actions"><button type="button" class="btn" id="cancel">Cancelar</button><div class="right"><button type="button" class="btn" id="another">Crear y crear otro</button><button class="btn primary" type="submit">✓ &nbsp;Crear cierre</button></div></div>
+ <div class="notice" role="status" aria-live="polite" id="notice"></div>
+ </form>
+</main>
+<script>
+(()=>{
+ const $=id=>document.getElementById(id), months=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+ const today=new Date(),year=$('year'),month=$('month'),notice=$('notice');
+ for(let y=today.getFullYear()+1;y>=today.getFullYear()-9;y--)year.add(new Option(String(y),String(y)));
+ months.forEach((m,i)=>month.add(new Option(m,String(i+1))));
+ year.value=String(today.getFullYear());month.value=String(today.getMonth()+1);
+ function syncDates(){const y=Number(year.value),m=Number(month.value);$('start').value=`${y}-${String(m).padStart(2,'0')}-01`;$('end').value=`${y}-${String(m).padStart(2,'0')}-${new Date(y,m,0).getDate()}`;}
+ syncDates();year.addEventListener('change',syncDates);month.addEventListener('change',syncDates);
+ function show(msg,error=false){notice.textContent=msg;notice.className='notice show'+(error?' error':'');}
+ function validate(){const start=$('start').value,end=$('end').value,y=year.value;if(!start||!end)return 'Debes completar ambas fechas.';if(start>end)return 'La fecha de inicio no puede ser posterior a la de fin.';if(start.slice(0,4)!==y||end.slice(0,4)!==y)return 'Las fechas deben pertenecer al año seleccionado.';return '';}
+ function save(reset){const err=validate();if(err){show(err,true);return;}show('Validación correcta. Esta maqueta no guarda registros; conecta esta acción con tu backend Laravel.');if(reset){$('folio').value='';$('status').value='abierto';}}
+ $('cierreForm').addEventListener('submit',e=>{e.preventDefault();save(false)});$('another').addEventListener('click',()=>save(true));$('cancel').addEventListener('click',()=>{$('cierreForm').reset();year.value=String(today.getFullYear());month.value=String(today.getMonth()+1);syncDates();notice.className='notice';});
+})();
+</script>
+</body>
+</html>

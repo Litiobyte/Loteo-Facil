@@ -4,6 +4,8 @@ namespace App\Filament\Resources\Propietarios\RelationManagers;
 
 use App\Domain\Owners\Services\LoteEligibilityService;
 use App\Domain\Owners\Services\LoteOwnershipAssignmentService;
+use App\Filament\Resources\Lotes\LoteResource;
+use App\Models\CommunitySetting;
 use App\Models\Lote;
 use DomainException;
 use Filament\Actions\Action;
@@ -12,9 +14,15 @@ use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class LotesRelationManager extends RelationManager
 {
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return CommunitySetting::current()->usesLots() && parent::canViewForRecord($ownerRecord, $pageClass);
+    }
+
     protected static string $relationship = 'lotesActivos';
 
     protected static ?string $title = 'Lotes';
@@ -22,6 +30,7 @@ class LotesRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->recordUrl(fn (Lote $record): string => LoteResource::getUrl('view', ['record' => $record]))
             ->columns([
                 TextColumn::make('codigo')
                     ->label('Codigo')

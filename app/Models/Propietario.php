@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Support\ChileanRut;
+use Brick\Math\BigDecimal;
 use Database\Factories\PropietarioFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -58,6 +59,30 @@ class Propietario extends Model
         return $this->belongsToMany(Lote::class, 'lote_propietario')
             ->withPivot(['assigned_at', 'unassigned_at', 'status'])
             ->withTimestamps();
+    }
+
+    public function shareHoldings(): HasMany
+    {
+        return $this->hasMany(ShareHolding::class);
+    }
+
+    public function shareContributions(): HasMany
+    {
+        return $this->hasMany(ShareContribution::class);
+    }
+
+    /** @return array{quantity: string, square_meters: string} */
+    public function shareTotals(): array
+    {
+        $quantity = BigDecimal::zero();
+        $area = BigDecimal::zero();
+        $holdings = $this->relationLoaded('shareHoldings') ? $this->shareHoldings : $this->shareHoldings()->get();
+        foreach ($holdings->where('status', 'active') as $holding) {
+            $quantity = $quantity->plus($holding->quantity);
+            $area = $area->plus($holding->equivalentSquareMeters());
+        }
+
+        return ['quantity' => (string) $quantity, 'square_meters' => (string) $area];
     }
 
     public function lotesActivos(): BelongsToMany

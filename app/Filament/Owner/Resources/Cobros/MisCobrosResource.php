@@ -19,6 +19,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
@@ -53,7 +54,7 @@ class MisCobrosResource extends Resource
         return $table
             ->modifyQueryUsing(function (Builder $query): Builder {
                 return $query
-                    ->with(['expense.category', 'allocations.payment'])
+                    ->with(['expense.category', 'allocations.payment', 'sourceLinks.consolidatedCharge'])
                     ->orderByRaw(
                         "
                         CASE
@@ -67,6 +68,11 @@ class MisCobrosResource extends Resource
             })
             ->defaultSort('due_date', 'asc')
             ->columns([
+                TextColumn::make('consolidation')
+                    ->label('Consolidación')
+                    ->badge()
+                    ->color('gray')
+                    ->state(fn (PartnerCharge $record): ?string => static::consolidationLabel($record)),
                 TextColumn::make('id')
                     ->label('ID')
                     ->formatStateUsing(fn (mixed $state): string => '#'.str_pad((string) $state, 3, '0', STR_PAD_LEFT))
@@ -95,6 +101,7 @@ class MisCobrosResource extends Resource
                     ->sortable()
                     ->summarize(Sum::make()->money('CLP', locale: 'es_CL')),
                 TextColumn::make('remaining_amount')
+                    ->state(fn (PartnerCharge $record): string => $record->status === ChargeStatus::Consolidated ? '0' : $record->remaining_amount)
                     ->label('Pendiente')
                     ->money('CLP', locale: 'es_CL')
                     ->badge()
@@ -103,7 +110,7 @@ class MisCobrosResource extends Resource
                     ->summarize(
                         Sum::make()
                             ->money('CLP', locale: 'es_CL')
-                            ->query(fn (Builder $query): Builder => $query->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Partial->value]))
+                            ->query(fn (\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Query\Builder => $query->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Partial->value]))
                     ),
                 TextColumn::make('due_date')
                     ->label('Vencimiento')
@@ -136,6 +143,7 @@ class MisCobrosResource extends Resource
                         ChargeStatus::Partial->value => 'Parcial',
                         ChargeStatus::Paid->value => 'Pagado',
                         ChargeStatus::Cancelled->value => 'Cancelado',
+                        ChargeStatus::Consolidated->value => 'Consolidado',
                     ]),
                 Filter::make('due_date_range')
                     ->label('Rango vencimiento')
@@ -172,6 +180,8 @@ class MisCobrosResource extends Resource
                         ExpenseDistributionType::EqualByPartner->value => ExpenseDistributionType::EqualByPartner->getLabel(),
                         ExpenseDistributionType::ProportionalByHectares->value => ExpenseDistributionType::ProportionalByHectares->getLabel(),
                         ExpenseDistributionType::Manual->value => ExpenseDistributionType::Manual->getLabel(),
+                        ExpenseDistributionType::ProportionalByShares->value => ExpenseDistributionType::ProportionalByShares->getLabel(),
+                        ExpenseDistributionType::ProportionalByEquivalentArea->value => ExpenseDistributionType::ProportionalByEquivalentArea->getLabel(),
                     ]),
             ])
             ->recordActions([
@@ -195,6 +205,11 @@ class MisCobrosResource extends Resource
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return Auth::user()?->hasRole('propietario') && Auth::user()?->propietario !== null;
     }
 
     public static function canEdit(Model $record): bool
@@ -230,7 +245,23 @@ class MisCobrosResource extends Resource
             ChargeStatus::Partial => 'Parcial',
             ChargeStatus::Paid => 'Pagado',
             ChargeStatus::Cancelled => 'Cancelado',
+            ChargeStatus::Consolidated => 'Consolidado',
         };
+    }
+
+    public static function consolidationLabel(PartnerCharge $record): ?string
+    {
+        $target = $record->status === ChargeStatus::Consolidated
+            ? $record->sourceLinks->first()?->consolidatedCharge
+            : ($record->charge_type === 'balance_consolidation' ? $record : null);
+
+        if (! $target || ! $target->consolidation_year || ! $target->consolidation_month) {
+            return null;
+        }
+
+        $month = Carbon::create($target->consolidation_year, $target->consolidation_month, 1)->locale('es')->translatedFormat('F Y');
+
+        return ($record->status === ChargeStatus::Consolidated ? 'Consolidado en ' : 'Saldo ').$month;
     }
 
     public static function statusColor(ChargeStatus|string $state): string
@@ -242,6 +273,7 @@ class MisCobrosResource extends Resource
             ChargeStatus::Partial => 'warning',
             ChargeStatus::Paid => 'success',
             ChargeStatus::Cancelled => 'gray',
+            ChargeStatus::Consolidated => 'gray',
         };
     }
 

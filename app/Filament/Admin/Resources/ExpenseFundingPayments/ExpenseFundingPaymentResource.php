@@ -7,8 +7,10 @@ use App\Domain\Expenses\Services\ExpenseFundingPaymentService;
 use App\Filament\Admin\Resources\ExpenseFundingPayments\Pages\ListExpenseFundingPayments;
 use App\Filament\Admin\Resources\ExpenseFundingPayments\Pages\ViewExpenseFundingPayment;
 use App\Filament\Admin\Resources\ExpenseResource;
+use App\Filament\Forms\ChileanNumberInput;
 use App\Models\Expense;
 use App\Models\ExpenseFundingPayment;
+use App\Support\AdminTableColumns;
 use BackedEnum;
 use DomainException;
 use Filament\Actions\Action;
@@ -16,7 +18,6 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -44,7 +45,7 @@ class ExpenseFundingPaymentResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Egresos';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Gastos Comunes';
+    protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
 
     protected static ?int $navigationSort = 50;
 
@@ -71,14 +72,11 @@ class ExpenseFundingPaymentResource extends Resource
                             ->displayFormat('d/m/Y')
                             ->maxDate(now())
                             ->default(now()->toDateString()),
-                        TextInput::make('amount')
+                        ChileanNumberInput::make('amount')
                             ->label('Monto egreso')
-                            ->numeric()
                             ->required()
                             ->minValue(0.01)
-                            ->step(0.01)
-                            ->prefix('$')
-                            ->suffix('CLP'),
+                            ->prefix('$'),
                         Textarea::make('notes')
                             ->label('Notas')
                             ->rows(2)
@@ -135,7 +133,7 @@ class ExpenseFundingPaymentResource extends Resource
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['expense', 'creator']))
             ->defaultSort('payment_date', 'desc')
-            ->columns([
+            ->columns(AdminTableColumns::contentSized([
                 TextColumn::make('id')
                     ->label('ID')
                     ->sortable(),
@@ -157,16 +155,16 @@ class ExpenseFundingPaymentResource extends Resource
                     ->boolean(),
                 TextColumn::make('void_reason')
                     ->label('Motivo anulación')
-                    ->limit(40)
                     ->placeholder('-'),
                 TextColumn::make('creator.name')
                     ->label('Creado por')
                     ->placeholder('-'),
                 TextColumn::make('created_at')
+                    ->toggleable()
                     ->label('Creado')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
-            ])
+            ]))
             ->filters([
                 SelectFilter::make('expense_id')
                     ->label('Gasto')
@@ -217,14 +215,11 @@ class ExpenseFundingPaymentResource extends Resource
                             ->native(false)
                             ->displayFormat('d/m/Y')
                             ->maxDate(now()),
-                        TextInput::make('amount')
+                        ChileanNumberInput::make('amount')
                             ->label('Monto egreso')
                             ->required()
-                            ->numeric()
                             ->minValue(0.01)
-                            ->step(0.01)
-                            ->prefix('$')
-                            ->suffix('CLP'),
+                            ->prefix('$'),
                         Textarea::make('notes')
                             ->label('Notas')
                             ->rows(2),
@@ -310,14 +305,11 @@ class ExpenseFundingPaymentResource extends Resource
                             ->displayFormat('d/m/Y')
                             ->default(now()->toDateString())
                             ->maxDate(now()),
-                        TextInput::make('amount')
+                        ChileanNumberInput::make('amount')
                             ->label('Monto egreso')
                             ->required()
-                            ->numeric()
                             ->minValue(0.01)
-                            ->step(0.01)
-                            ->prefix('$')
-                            ->suffix('CLP'),
+                            ->prefix('$'),
                         Textarea::make('notes')
                             ->label('Notas')
                             ->rows(2),
@@ -412,7 +404,7 @@ class ExpenseFundingPaymentResource extends Resource
                         '#%d · %s · Saldo %s',
                         $expense->id,
                         $expense->title,
-                        number_format($pending, 2, ',', '.').' CLP',
+                        '$'.number_format($pending, 0, ',', '.'),
                     ),
                 ];
             })

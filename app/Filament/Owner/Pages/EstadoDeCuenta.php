@@ -5,6 +5,7 @@ namespace App\Filament\Owner\Pages;
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Domain\Statements\Services\PartnerStatementService;
 use App\Filament\Owner\Resources\Cobros\MisCobrosResource;
+use App\Models\CommunitySetting;
 use App\Models\PartnerCharge;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -45,6 +46,11 @@ class EstadoDeCuenta extends Page implements HasTable
     {
         $this->setQuickFilter('all');
         $this->monthComparison = $this->calculateMonthComparison();
+    }
+
+    public function getHeading(): string
+    {
+        return 'Estado de cuenta · '.CommunitySetting::displayName();
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -129,7 +135,7 @@ class EstadoDeCuenta extends Page implements HasTable
         ];
 
         $debtByCategory = $statement['charges']
-            ->filter(fn ($charge): bool => (float) $charge->remaining_amount > 0)
+            ->filter(fn ($charge): bool => in_array($charge->status->value, ['pending', 'partial'], true) && (float) $charge->remaining_amount > 0)
             ->groupBy(fn ($charge): string => $charge->expense?->category?->name ?? 'Sin categoría')
             ->map(fn ($items): float => round((float) $items->sum('remaining_amount'), 2))
             ->filter(fn (float $amount): bool => $amount > 0)
@@ -207,6 +213,7 @@ class EstadoDeCuenta extends Page implements HasTable
                             ChargeStatus::Partial => 'Parcial',
                             ChargeStatus::Paid => 'Pagado',
                             ChargeStatus::Cancelled => 'Cancelado',
+                            ChargeStatus::Consolidated => 'Consolidado',
                         };
                     })
                     ->color(function (ChargeStatus|string $state): string {
@@ -217,6 +224,7 @@ class EstadoDeCuenta extends Page implements HasTable
                             ChargeStatus::Partial => 'warning',
                             ChargeStatus::Paid => 'success',
                             ChargeStatus::Cancelled => 'gray',
+                            ChargeStatus::Consolidated => 'gray',
                         };
                     }),
             ])

@@ -4,7 +4,12 @@ namespace App\Domain\Expenses\Services;
 
 use App\Domain\Expenses\Enums\ExpenseDistributionType;
 use App\Domain\Expenses\Enums\ExpenseStatus;
+use App\Models\CommunitySetting;
 use App\Models\Expense;
+use App\Models\Propietario;
+use App\Models\ShareHolding;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use DomainException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -32,17 +37,41 @@ class ExpenseDistributionService
             throw new DomainException('La distribución manual aún no está implementada.');
         }
 
+        $settings = CommunitySetting::current();
+        if (! array_key_exists($expense->distribution_type->value, ExpenseDistributionType::availableOptions())) {
+            throw new DomainException('El criterio no está habilitado en la modalidad actual.');
+        }
+        if (in_array($expense->distribution_type, [ExpenseDistributionType::ProportionalByShares, ExpenseDistributionType::ProportionalByEquivalentArea], true)
+            || ($expense->distribution_type === ExpenseDistributionType::EqualByPartner && $settings->usesShares())) {
+            return $this->calculateShareDistribution($expense, $settings);
+        }
+
         $owners = $this->activeOwnersWithHectares();
 
         if ($owners->isEmpty()) {
             throw new DomainException('No hay propietarios activos con lotes activos para distribuir el gasto.');
         }
 
-        return match ($expense->distribution_type) {
+        $distribution = match ($expense->distribution_type) {
             ExpenseDistributionType::EqualByPartner => $this->calculateEqualDistribution($expense, $owners),
             ExpenseDistributionType::ProportionalByHectares => $this->calculateProportionalDistribution($expense, $owners),
             default => throw new DomainException('Tipo de distribución no soportado.'),
         };
+
+        foreach ($distribution as &$row) {
+            $equal = $expense->distribution_type === ExpenseDistributionType::EqualByPartner;
+            $row['distribution_snapshot'] = [
+                'mode' => $settings->mode, 'type' => $expense->distribution_type->value,
+                'unit' => $equal ? 'owner' : 'hectare',
+                'base' => $equal ? '1' : (string) $row['partner_hectares_at_moment'],
+                'total_base' => $equal ? (string) count($distribution) : (string) $row['total_hectares_at_moment'],
+                'amount' => (string) $row['amount'], 'expense_id' => $expense->id,
+                'rounding' => 'legacy_last_owner',
+            ];
+        }
+        unset($row);
+
+        return $distribution;
     }
 
     /**
@@ -182,5 +211,81 @@ class ExpenseDistributionService
             ->groupBy('lote_propietario.propietario_id')
             ->orderBy('lote_propietario.propietario_id')
             ->get();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function calculateShareDistribution(Expense $expense, CommunitySetting $settings): array
+    {
+        $equal = $expense->distribution_type === ExpenseDistributionType::EqualByPartner;
+        $byArea = $expense->distribution_type === ExpenseDistributionType::ProportionalByEquivalentArea;
+        $owners = [];
+        foreach (ShareHolding::query()->where('status', 'active')->where('quantity', '>', 0)->orderBy('id')->get() as $holding) {
+            $id = $holding->propietario_id;
+            $owners[$id] ??= ['quantity' => BigDecimal::zero(), 'area' => BigDecimal::zero(), 'holdings' => []];
+            $owners[$id]['quantity'] = $owners[$id]['quantity']->plus($holding->quantity);
+            $owners[$id]['area'] = $owners[$id]['area']->plus($holding->equivalentSquareMeters());
+            $owners[$id]['holdings'][] = $holding->only(['id', 'quantity', 'square_meters_per_share']);
+        }
+        if ($equal) {
+            $ids = $settings->mode === 'shares'
+                ? Propietario::query()->orderBy('id')->pluck('id')
+                : $this->activeOwnersWithHectares()->pluck('propietario_id')->merge(array_keys($owners))->unique();
+            foreach ($ids as $id) {
+                $owners[$id] ??= ['quantity' => BigDecimal::zero(), 'area' => BigDecimal::zero(), 'holdings' => []];
+            }
+        }
+        ksort($owners);
+        if ($owners === []) {
+            throw new DomainException('No hay propietarios elegibles para distribuir el gasto.');
+        }
+        $totalWeight = BigDecimal::zero();
+        foreach ($owners as &$owner) {
+            $owner['weight'] = $equal ? BigDecimal::one() : ($byArea ? $owner['area'] : $owner['quantity']);
+            $totalWeight = $totalWeight->plus($owner['weight']);
+        }
+        unset($owner);
+        if ($totalWeight->isZero()) {
+            throw new DomainException('No hay unidades elegibles para distribuir el gasto.');
+        }
+        $cents = BigDecimal::of($expense->amount)->multipliedBy(100)->toScale(0, RoundingMode::UNNECESSARY);
+        $allocated = BigDecimal::zero();
+        foreach ($owners as $id => &$owner) {
+            $exact = $cents->multipliedBy($owner['weight']);
+            $owner['cents'] = $exact->dividedBy($totalWeight, 0, RoundingMode::DOWN);
+            $owner['remainder'] = $exact->minus($owner['cents']->multipliedBy($totalWeight));
+            $allocated = $allocated->plus($owner['cents']);
+        }
+        unset($owner);
+        $order = array_keys($owners);
+        usort($order, fn (int $a, int $b): int => $owners[$b]['remainder']->compareTo($owners[$a]['remainder']) ?: ($a <=> $b));
+        $remaining = $cents->minus($allocated)->toInt();
+        for ($i = 0; $i < $remaining; $i++) {
+            $owners[$order[$i]]['cents'] = $owners[$order[$i]]['cents']->plus(1);
+        }
+        $rows = [];
+        foreach ($owners as $id => $owner) {
+            if ($owner['cents']->isZero()) {
+                continue;
+            }
+            $amount = (string) $owner['cents']->dividedBy(100, 2);
+            $snapshot = [
+                'mode' => $settings->mode, 'type' => $expense->distribution_type->value,
+                'unit' => $equal ? 'owner' : ($byArea ? 'm2' : 'share'),
+                'base' => (string) $owner['weight'], 'total_base' => (string) $totalWeight,
+                'quantity' => (string) $owner['quantity'], 'equivalent_square_meters' => (string) $owner['area'],
+                'holdings' => $owner['holdings'], 'amount' => $amount, 'expense_id' => $expense->id,
+                'rounding' => 'largest_remainder_owner_id',
+            ];
+            $rows[] = [
+                'propietario_id' => (int) $id, 'amount' => $amount,
+                'calculation_type' => $expense->distribution_type->value,
+                'partner_hectares_at_moment' => null, 'total_hectares_at_moment' => null,
+                'percentage_applied' => (string) $owner['weight']->multipliedBy(100)->dividedBy($totalWeight, 2, RoundingMode::HALF_UP),
+                'calculation_notes' => 'Base congelada en distribution_snapshot. Redondeo por mayor residuo.',
+                'distribution_snapshot' => $snapshot,
+            ];
+        }
+
+        return $rows;
     }
 }

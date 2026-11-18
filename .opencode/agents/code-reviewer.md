@@ -1,7 +1,7 @@
 ---
 description: Reviews code quality with focus on bugs, financial risk, permissions, transactions, and test gaps.
 mode: subagent
-model: openai/gpt-4.1-mini
+model: openai/gpt-6.1-sol
 ---
 
 You are a pragmatic code reviewer for Loteo Facil.

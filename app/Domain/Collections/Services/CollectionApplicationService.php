@@ -22,15 +22,15 @@ class CollectionApplicationService
      */
     public function applyCollectionAutomatically(Collection $payment): SupportCollection
     {
-        $this->validateCollectionCanBeApplied($payment);
-
-        $availableCharges = $this->getAvailableCharges($payment);
-
-        if ($availableCharges->isEmpty()) {
-            throw new DomainException('No hay cobros pendientes para aplicar este pago.');
-        }
-
-        return DB::transaction(function () use ($payment, $availableCharges): SupportCollection {
+        return DB::transaction(function () use ($payment): SupportCollection {
+            $payment = Collection::query()->lockForUpdate()->findOrFail($payment->id);
+            $this->validateCollectionCanBeApplied($payment);
+            $availableCharges = PartnerCharge::query()->where('propietario_id', $payment->propietario_id)
+                ->unpaid()->orderByRaw('due_date IS NULL ASC, due_date ASC')
+                ->orderBy('created_at')->lockForUpdate()->get();
+            if ($availableCharges->isEmpty()) {
+                throw new DomainException('No hay cobros pendientes para aplicar este pago.');
+            }
             $allocations = new SupportCollection;
             $remainingCollection = round((float) $payment->unapplied_amount, 2);
 
@@ -78,11 +78,18 @@ class CollectionApplicationService
         $this->validateManualAllocations($payment, $chargeAllocations);
 
         return DB::transaction(function () use ($payment, $chargeAllocations): SupportCollection {
+            $payment = Collection::query()->lockForUpdate()->findOrFail($payment->id);
+            $this->validateCollectionCanBeApplied($payment);
+            $this->validateManualAllocations($payment, $chargeAllocations);
             $allocations = new SupportCollection;
 
             foreach ($chargeAllocations as $item) {
                 $charge = PartnerCharge::query()->lockForUpdate()->findOrFail($item['charge_id']);
                 $amount = round((float) $item['amount'], 2);
+
+                if (! in_array($charge->status, [ChargeStatus::Pending, ChargeStatus::Partial], true)) {
+                    throw new DomainException("El cobro #{$charge->id} no está pendiente.");
+                }
 
                 if ($charge->propietario_id !== $payment->propietario_id) {
                     throw new DomainException("El cobro #{$charge->id} no pertenece al propietario del pago.");
@@ -115,6 +122,10 @@ class CollectionApplicationService
         DB::transaction(function () use ($allocation): void {
             $payment = Collection::query()->lockForUpdate()->findOrFail($allocation->collection_id);
             $charge = PartnerCharge::query()->lockForUpdate()->findOrFail($allocation->partner_charge_id);
+
+            if ($charge->status === ChargeStatus::Consolidated) {
+                throw new DomainException('No se puede revertir una asignación de un cobro consolidado; revise la consolidación.');
+            }
 
             if ($payment->status === CollectionStatus::Cancelled) {
                 throw new DomainException('No se puede revertir una aplicación de un pago cancelado.');

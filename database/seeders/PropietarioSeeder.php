@@ -16,9 +16,9 @@ class PropietarioSeeder extends Seeder
      */
     public function run(): void
     {
-        // Generar 20 propietarios con usuarios asociados
+        // Generar 45 propietarios con usuarios asociados
         $propietarios = Propietario::factory()
-            ->count(20)
+            ->count(45)
             ->create()
             ->each(function (Propietario $propietario): void {
                 $propietario->user->assignRole('propietario');

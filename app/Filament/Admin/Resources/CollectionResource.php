@@ -10,12 +10,16 @@ use App\Filament\Admin\Resources\CollectionResource\Pages\EditCollection;
 use App\Filament\Admin\Resources\CollectionResource\Pages\ListCollections;
 use App\Filament\Admin\Resources\CollectionResource\Pages\ViewCollection;
 use App\Filament\Admin\Resources\CollectionResource\RelationManagers\AllocationsRelationManager;
+use App\Filament\Forms\ChileanNumberInput;
 use App\Models\Collection;
 use App\Models\PartnerCharge;
+use App\Support\AdminTableColumns;
 use BackedEnum;
 use DomainException;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
@@ -51,7 +55,7 @@ class CollectionResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Recaudaciones';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Gastos Comunes';
+    protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
 
     protected static ?int $navigationSort = 40;
 
@@ -72,14 +76,11 @@ class CollectionResource extends Resource
                             ->validationMessages([
                                 'required' => 'Debe seleccionar un propietario.',
                             ]),
-                        TextInput::make('amount')
+                        ChileanNumberInput::make('amount')
                             ->label('Monto')
-                            ->numeric()
                             ->required()
                             ->minValue(0.01)
-                            ->step(0.01)
                             ->prefix('$')
-                            ->suffix('CLP')
                             ->rule('gt:0')
                             ->helperText('Ingrese el monto total recibido para este pago.')
                             ->validationMessages([
@@ -134,16 +135,14 @@ class CollectionResource extends Resource
                                 CollectionStatus::FullyApplied->value => 'Totalmente aplicado',
                                 CollectionStatus::Cancelled->value => 'Cancelado',
                             ]),
-                        TextInput::make('applied_amount')
+                        ChileanNumberInput::make('applied_amount')
                             ->label('Monto aplicado')
                             ->prefix('$')
-                            ->suffix('CLP')
                             ->disabled()
                             ->dehydrated(false),
-                        TextInput::make('unapplied_amount')
+                        ChileanNumberInput::make('unapplied_amount')
                             ->label('Monto no aplicado')
                             ->prefix('$')
-                            ->suffix('CLP')
                             ->disabled()
                             ->dehydrated(false),
                     ]),
@@ -195,7 +194,7 @@ class CollectionResource extends Resource
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('propietario')->withCount('allocations'))
             ->defaultSort('collection_date', 'desc')
-            ->columns([
+            ->columns(AdminTableColumns::contentSized([
                 TextColumn::make('propietario.nombre')
                     ->label('Propietario')
                     ->state(fn (Collection $record): string => $record->propietario?->nombre_completo ?? '-')
@@ -243,7 +242,7 @@ class CollectionResource extends Resource
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-            ])
+            ]))
             ->filters([
                 SelectFilter::make('propietario_id')
                     ->label('Propietario')
@@ -341,7 +340,7 @@ class CollectionResource extends Resource
                     ->color('primary')
                     ->visible(fn (Collection $record): bool => static::canApplyCollection($record))
                     ->modalHeading('Aplicar pago manualmente')
-                    ->modalDescription(fn (Collection $record): string => 'Saldo disponible para aplicar: '.number_format((float) $record->unapplied_amount, 2, ',', '.').' CLP')
+                    ->modalDescription(fn (Collection $record): string => 'Saldo disponible para aplicar: $'.number_format((float) $record->unapplied_amount, 0, ',', '.'))
                     ->modalSubmitActionLabel('Aplicar manualmente')
                     ->form([
                         Repeater::make('allocations')
@@ -356,14 +355,11 @@ class CollectionResource extends Resource
                                     ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->options(fn (Collection $record): array => static::getAvailableChargeOptions($record))
                                     ->helperText('Solo se muestran cobros impagos del mismo propietario.'),
-                                TextInput::make('amount')
+                                ChileanNumberInput::make('amount')
                                     ->label('Monto a aplicar')
-                                    ->numeric()
                                     ->required()
                                     ->minValue(0.01)
-                                    ->step(0.01)
                                     ->prefix('$')
-                                    ->suffix('CLP')
                                     ->validationMessages([
                                         'required' => 'Debe ingresar el monto a aplicar.',
                                         'min' => 'El monto debe ser mayor a 0.',
@@ -419,6 +415,14 @@ class CollectionResource extends Resource
                 DeleteAction::make()
                     ->requiresConfirmation()
                     ->visible(fn (Collection $record): bool => static::canDelete($record)),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->requiresConfirmation()
+                        ->authorizeIndividualRecords(fn (Collection $record): bool => static::canDelete($record)),
+                ]),
             ]);
     }
 
@@ -571,7 +575,7 @@ class CollectionResource extends Resource
                         '#%d · %s · Saldo %s',
                         $charge->id,
                         $cleanDescription,
-                        number_format((float) $charge->remaining_amount, 2, ',', '.').' CLP',
+                        '$'.number_format((float) $charge->remaining_amount, 0, ',', '.'),
                     ),
                 ];
             })
@@ -591,7 +595,7 @@ class CollectionResource extends Resource
             ->map(fn (array $allocation): string => sprintf(
                 '• Cobro #%d: %s',
                 (int) $allocation['charge_id'],
-                number_format((float) $allocation['allocation_amount'], 2, ',', '.').' CLP',
+                '$'.number_format((float) $allocation['allocation_amount'], 0, ',', '.'),
             ))
             ->implode("\n");
 
@@ -600,8 +604,8 @@ class CollectionResource extends Resource
         $summary = sprintf(
             "Se aplicarán %d asignaciones por un total de %s.\nSaldo remanente del pago: %s.",
             count($preview['allocations']),
-            number_format((float) $preview['total_allocated'], 2, ',', '.').' CLP',
-            number_format((float) $preview['remaining_credit'], 2, ',', '.').' CLP',
+            '$'.number_format((float) $preview['total_allocated'], 0, ',', '.'),
+            '$'.number_format((float) $preview['remaining_credit'], 0, ',', '.'),
         );
 
         if ($extraCount > 0) {

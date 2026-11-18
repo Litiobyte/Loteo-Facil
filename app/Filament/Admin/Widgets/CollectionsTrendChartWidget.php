@@ -17,6 +17,7 @@ class CollectionsTrendChartWidget extends ChartWidget
     protected int|string|array $columnSpan = [
         'md' => 8,
         'xl' => 8,
+        '2xl' => 13,
     ];
 
     protected ?string $pollingInterval = '60s';

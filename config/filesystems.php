@@ -41,7 +41,8 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // Local public files share the request origin, including its scheme and port.
+            'url' => '/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
