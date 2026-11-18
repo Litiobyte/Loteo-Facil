@@ -1,4 +1,3 @@
-@script
 <script>
     if (!window.loteoMapViewerAssets) {
         window.loteoMapViewerAssets = true;
@@ -222,7 +221,6 @@
             },
         });
     </script>
-@endscript
 
 <div wire:key="{{ $mapKey }}" x-data="loteoMapViewer(
     @js($featureCollection),
