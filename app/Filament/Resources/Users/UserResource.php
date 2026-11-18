@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Users;
 use App\Domain\Users\Services\UserRoleAssignmentService;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Models\User;
+use App\Support\AdminTableColumns;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -16,9 +17,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -70,19 +71,34 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
+            ->columns(AdminTableColumns::contentSized([
                 TextColumn::make('name')
                     ->label('Nombre')
+                    ->sortable()
                     ->searchable(),
                 TextColumn::make('email')
                     ->label('Email')
+                    ->sortable()
                     ->searchable(),
                 TextColumn::make('roles.name')
                     ->label('Rol')
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        $roles = $query->getModel()->roles();
+                        $roleName = $roles->getRelated()->qualifyColumn('name');
+                        $firstRole = $roles->getRelationExistenceQuery($roles->getRelated()->newQuery(), $query, [$roleName])
+                            ->orderBy($roleName)
+                            ->limit(1);
+
+                        return $query->orderBy($firstRole, $direction);
+                    })
+                    ->toggleable()
                     ->badge(),
-            ])
+            ]))
             ->filters([
-                //
+                SelectFilter::make('roles')
+                    ->label('Rol')
+                    ->relationship('roles', 'name')
+                    ->preload(),
             ])
             ->recordActions([
                 EditAction::make()

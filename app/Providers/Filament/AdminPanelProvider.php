@@ -11,6 +11,7 @@ use App\Filament\Admin\Widgets\OverduePortfolioStatWidget;
 use App\Filament\Admin\Widgets\OwnersOnTimeStatWidget;
 use App\Filament\Admin\Widgets\PendingPortfolioStatWidget;
 use App\Filament\Admin\Widgets\TopDelinquentOwnersWidget;
+use App\Models\CommunitySetting;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -19,7 +20,9 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -35,6 +38,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->maxContentWidth(Width::Full)
             ->login()
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
@@ -45,8 +49,28 @@ class AdminPanelProvider extends PanelProvider
                 ])->render(),
             )
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::hex('#1E6432'),
+                'success' => Color::hex('#1E6432'),
+                'warning' => Color::hex('#936000'),
+                'danger' => Color::hex('#B42318'),
+                'info' => Color::hex('#0B2E57'),
             ])
+            ->font('Montserrat')
+            ->brandLogo(fn (): Htmlable => view('filament.branding.brand-logo'))
+            ->brandLogoHeight('3.5rem')
+            ->favicon(fn (): string => CommunitySetting::logoUrl(icon: true))
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => view('filament.branding.design-tokens')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+                fn (): string => view('filament.auth.switch-login-link', [
+                    'label' => 'Eres propietario?',
+                    'linkText' => 'Ingresar aqui',
+                    'routeName' => 'filament.owner.auth.login',
+                ])->render(),
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\Filament\Admin\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
@@ -69,8 +93,9 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->collapsedSidebarWidth('5rem')
             ->navigationGroups([
-                NavigationGroup::make('Gastos Comunes'),
                 NavigationGroup::make('Finanzas'),
+                NavigationGroup::make('Loteo'),
+                NavigationGroup::make('Importaciones'),
             ])
             ->middleware([
                 EncryptCookies::class,
