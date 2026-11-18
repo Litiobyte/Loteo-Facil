@@ -3,8 +3,12 @@
 namespace App\Filament\Owner\Resources\Lotes;
 
 use App\Filament\Owner\Resources\Lotes\Pages\ListMisLotes;
+use App\Filament\Owner\Resources\Lotes\Pages\ViewLote;
+use App\Models\CommunitySetting;
 use App\Models\Lote;
+use App\Support\ChileanNumber;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -16,6 +20,11 @@ use UnitEnum;
 
 class LoteResource extends Resource
 {
+    public static function shouldRegisterNavigation(): bool
+    {
+        return CommunitySetting::current()->usesLots();
+    }
+
     protected static ?string $model = Lote::class;
 
     protected static string|BackedEnum|null $navigationIcon = null;
@@ -47,8 +56,8 @@ class LoteResource extends Resource
                     ->label('Estado')
                     ->badge(),
                 TextColumn::make('metros_cuadrados')
-                    ->label('m2')
-                    ->numeric(0),
+                    ->label('m²')
+                    ->formatStateUsing(fn (mixed $state): ?string => ChileanNumber::format($state)),
                 TextColumn::make('hectareas')
                     ->label('Hectareas')
                     ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.').' ha'),
@@ -65,7 +74,11 @@ class LoteResource extends Resource
                 //
             ])
             ->recordActions([
-                // Read-only.
+                Action::make('ver_detalle')
+                    ->label('Ver detalle')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->url(fn (Lote $record): string => static::getUrl('view', ['record' => $record])),
             ])
             ->toolbarActions([
                 // Read-only.
@@ -108,6 +121,7 @@ class LoteResource extends Resource
     {
         return [
             'index' => ListMisLotes::route('/'),
+            'view' => ViewLote::route('/{record}'),
         ];
     }
 }
