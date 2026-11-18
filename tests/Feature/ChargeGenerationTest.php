@@ -239,6 +239,32 @@ class ChargeGenerationTest extends TestCase
         $this->service->generateChargesFromExpense($expense);
     }
 
+    public function test_stale_expense_cannot_generate_duplicate_charges(): void
+    {
+        $propietario = Propietario::factory()->create();
+        $lote = Lote::factory()->create();
+        $propietario->lotes()->attach($lote, [
+            'assigned_at' => now(),
+            'status' => 'active',
+        ]);
+
+        $expense = Expense::factory()->registered()->create([
+            'distribution_type' => ExpenseDistributionType::EqualByPartner,
+        ]);
+        $staleExpense = Expense::query()->findOrFail($expense->id);
+
+        $this->service->generateChargesFromExpense($expense);
+
+        try {
+            $this->service->generateChargesFromExpense($staleExpense);
+            $this->fail('La segunda generación debía rechazarse.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('estado registrado', $exception->getMessage());
+        }
+
+        $this->assertSame(1, PartnerCharge::byExpense($expense->id)->count());
+    }
+
     public function test_charge_description_is_generated_correctly(): void
     {
         // Arrange

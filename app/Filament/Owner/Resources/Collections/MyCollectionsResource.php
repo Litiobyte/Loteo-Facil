@@ -84,10 +84,10 @@ class MyCollectionsResource extends Resource
                     ->color(fn (float|string|null $state): string => (float) $state > 0 ? 'success' : 'gray')
                     ->formatStateUsing(function (Collection $record): string {
                         if ((float) $record->unapplied_amount > 0) {
-                            return number_format((float) $record->unapplied_amount, 2, ',', '.').' CLP (Saldo a favor)';
+                            return '$'.number_format((float) $record->unapplied_amount, 0, ',', '.').' (Saldo a favor)';
                         }
 
-                        return number_format((float) $record->unapplied_amount, 2, ',', '.').' CLP';
+                        return '$'.number_format((float) $record->unapplied_amount, 0, ',', '.');
                     })
                     ->sortable()
                     ->summarize(Sum::make()->money('CLP', locale: 'es_CL')),

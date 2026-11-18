@@ -28,6 +28,10 @@ class PartnerCharge extends Model
     protected $fillable = [
         'propietario_id',
         'expense_id',
+        'charge_type',
+        'consolidation_year',
+        'consolidation_month',
+        'imputation_date',
         'amount',
         'paid_amount',
         'remaining_amount',
@@ -39,6 +43,7 @@ class PartnerCharge extends Model
         'total_hectares_at_moment',
         'percentage_applied',
         'calculation_notes',
+        'distribution_snapshot',
     ];
 
     /** @var array<string, mixed> */
@@ -46,6 +51,7 @@ class PartnerCharge extends Model
         'paid_amount' => 0,
         'remaining_amount' => 0,
         'status' => ChargeStatus::Pending,
+        'charge_type' => 'distribution',
     ];
 
     /**
@@ -62,7 +68,9 @@ class PartnerCharge extends Model
             'percentage_applied' => 'decimal:2',
             'status' => ChargeStatus::class,
             'due_date' => 'date',
+            'imputation_date' => 'date',
             'calculation_type' => ExpenseDistributionType::class,
+            'distribution_snapshot' => 'array',
         ];
     }
 
@@ -73,7 +81,8 @@ class PartnerCharge extends Model
 
             $validator = Validator::make($charge->attributesToArray(), [
                 'propietario_id' => ['required', 'exists:propietarios,id'],
-                'expense_id' => ['required', 'exists:expenses,id'],
+                'expense_id' => [$charge->charge_type === 'distribution' ? 'required' : 'nullable', 'exists:expenses,id'],
+                'charge_type' => ['required', Rule::in(['distribution', 'balance_consolidation'])],
                 'amount' => ['required', 'numeric', 'gt:0'],
                 'paid_amount' => ['required', 'numeric', 'gte:0', 'lte:amount'],
                 'remaining_amount' => ['required', 'numeric', 'gte:0'],
@@ -100,6 +109,10 @@ class PartnerCharge extends Model
 
             $closingService = app(MonthlyClosingService::class);
 
+            if ($original->status === ChargeStatus::Consolidated && array_diff(array_keys($charge->getDirty()), ['updated_at']) !== []) {
+                throw new DomainException('No se puede modificar un cobro cuyo saldo fue consolidado.');
+            }
+
             if ($closingService->isDateInClosedPeriod($original->created_at)) {
                 $dirty = array_keys($charge->getDirty());
                 $allowedForCollectionApplication = [
@@ -116,7 +129,7 @@ class PartnerCharge extends Model
                 }
             }
 
-            if ($original->expense->status !== ExpenseStatus::Registered) {
+            if ($original->expense !== null && $original->expense->status !== ExpenseStatus::Registered) {
                 $dirty = array_keys($charge->getDirty());
 
                 // Campos que SÍ pueden actualizarse al aplicar pagos
@@ -156,6 +169,16 @@ class PartnerCharge extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(CollectionAllocation::class);
+    }
+
+    public function consolidationLinks(): HasMany
+    {
+        return $this->hasMany(PartnerChargeConsolidationLink::class, 'consolidated_charge_id');
+    }
+
+    public function sourceLinks(): HasMany
+    {
+        return $this->hasMany(PartnerChargeConsolidationLink::class, 'source_charge_id');
     }
 
     #[Scope]

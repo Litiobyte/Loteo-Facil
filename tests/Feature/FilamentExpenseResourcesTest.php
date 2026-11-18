@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Domain\Expenses\Enums\ExpenseStatus;
+use App\Domain\Expenses\Services\ChargeGenerationService;
 use App\Filament\Admin\Resources\AccountingPeriods\AccountingPeriodResource;
 use App\Filament\Admin\Resources\CollectionResource;
 use App\Filament\Admin\Resources\ExpenseCategoryResource;
 use App\Filament\Admin\Resources\ExpenseFundingPayments\ExpenseFundingPaymentResource;
 use App\Filament\Admin\Resources\ExpenseResource;
+use App\Filament\Admin\Resources\ExpenseResource\Pages\CreateExpense;
+use App\Filament\Admin\Resources\ExpenseResource\Pages\ListExpenses;
 use App\Filament\Admin\Resources\ExpenseResource\Pages\ViewExpense;
 use App\Filament\Admin\Resources\ExpenseResource\RelationManagers\FundingCollectionsRelationManager;
 use App\Filament\Admin\Resources\PartnerChargeResource;
@@ -15,16 +18,67 @@ use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\PartnerCharge;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Filament\PanelRegistry;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class FilamentExpenseResourcesTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_recurring_form_creates_series_and_future_actions_delegate(): void
+    {
+        Role::findOrCreate('admin', 'web');
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $category = ExpenseCategory::factory()->create();
+
+        Livewire::test(CreateExpense::class)
+            ->fillForm([
+                'title' => 'Serie UI',
+                'expense_category_id' => $category->id,
+                'amount' => 1000,
+                'expense_date' => '2026-01-10',
+                'due_date' => '2026-01-20',
+                'distribution_type' => 'equal_by_partner',
+                'is_recurring' => true,
+                'recurrence_end_date' => '2026-03-10',
+            ])->call('create')->assertHasNoFormErrors();
+
+        $head = Expense::query()->where('title', 'Serie UI')->whereNull('parent_expense_id')->firstOrFail();
+        $this->assertTrue($head->is_recurring);
+        $this->assertSame('2026-03-10', $head->recurrence_end_date->toDateString());
+        $this->assertCount(2, $head->children);
+
+        Livewire::test(ListExpenses::class)
+            ->callTableAction('edit_future_instances', $head, ['amount' => 2000, 'due_date' => '2026-04-20', 'notes' => 'Ajuste'])
+            ->assertHasNoTableActionErrors();
+        $this->assertSame('2000.00', $head->children()->first()->amount);
+        $this->assertSame('1000.00', $head->fresh()->amount);
+
+        Livewire::test(ListExpenses::class)
+            ->callTableAction('cancel_future_instances', $head);
+        $this->assertSame(2, $head->children()->where('status', ExpenseStatus::Cancelled)->count());
+
+        Livewire::test(CreateExpense::class)
+            ->fillForm([
+                'title' => 'Serie inválida',
+                'expense_category_id' => $category->id,
+                'amount' => 1000,
+                'expense_date' => '2026-01-10',
+                'distribution_type' => 'equal_by_partner',
+                'is_recurring' => true,
+                'recurrence_end_date' => '2027-01-10',
+            ])->call('create')->assertHasFormErrors(['recurrence_end_date']);
+        $this->assertDatabaseMissing('expenses', ['title' => 'Serie inválida']);
+    }
 
     public function test_expense_resources_are_restricted_to_admin_and_super_admin_roles(): void
     {
@@ -118,11 +172,12 @@ class FilamentExpenseResourcesTest extends TestCase
 
     public function test_financial_navigation_groups_and_order_are_configured_as_expected(): void
     {
-        $this->assertSame('Gastos Comunes', PartnerChargeResource::getNavigationGroup());
-        $this->assertSame('Gastos Comunes', ExpenseCategoryResource::getNavigationGroup());
-        $this->assertSame('Gastos Comunes', ExpenseResource::getNavigationGroup());
-        $this->assertSame('Gastos Comunes', CollectionResource::getNavigationGroup());
-        $this->assertSame('Gastos Comunes', ExpenseFundingPaymentResource::getNavigationGroup());
+        $this->assertSame('Finanzas', PartnerChargeResource::getNavigationGroup());
+        $this->assertSame('Finanzas', ExpenseCategoryResource::getNavigationGroup());
+        $this->assertSame('Finanzas', ExpenseResource::getNavigationGroup());
+        $this->assertSame('Finanzas', CollectionResource::getNavigationGroup());
+        $this->assertSame('Finanzas', ExpenseFundingPaymentResource::getNavigationGroup());
+        $this->assertSame('Finanzas', AccountingPeriodResource::getNavigationGroup());
 
         $this->assertSame(10, PartnerChargeResource::getNavigationSort());
         $this->assertSame(20, ExpenseCategoryResource::getNavigationSort());
@@ -243,5 +298,77 @@ class FilamentExpenseResourcesTest extends TestCase
         $this->actingAs($superAdmin);
 
         $this->get('/admin/expenses')->assertOk();
+    }
+
+    public function test_bulk_cancellation_and_deletion_only_process_registered_expenses(): void
+    {
+        Role::findOrCreate('admin', 'web');
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $registered = Expense::factory()->registered()->create();
+        $distributed = Expense::factory()->distributed()->create();
+        $paid = Expense::factory()->paid()->create();
+        $cancelled = Expense::factory()->cancelled()->create();
+
+        Livewire::test(ListExpenses::class)
+            ->callTableBulkAction('cancel_selected_expenses', [$registered, $distributed, $paid, $cancelled])
+            ->assertHasNoTableActionErrors()
+            ->assertNotified();
+
+        $this->assertSame(ExpenseStatus::Cancelled, $registered->fresh()->status);
+        $this->assertSame(ExpenseStatus::Distributed, $distributed->fresh()->status);
+        $this->assertSame(ExpenseStatus::Paid, $paid->fresh()->status);
+        $this->assertSame(ExpenseStatus::Cancelled, $cancelled->fresh()->status);
+
+        $deletable = Expense::factory()->registered()->create();
+
+        Livewire::test(ListExpenses::class)
+            ->callTableBulkAction('delete_selected_expenses', [$deletable, $registered, $distributed, $paid])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertModelMissing($deletable);
+        $this->assertModelExists($registered);
+        $this->assertModelExists($distributed);
+        $this->assertModelExists($paid);
+    }
+
+    public function test_bulk_distribution_skips_other_states_and_continues_after_a_service_error(): void
+    {
+        Role::findOrCreate('admin', 'web');
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $failed = Expense::factory()->registered()->create();
+        $successful = Expense::factory()->registered()->create();
+        $distributed = Expense::factory()->distributed()->create();
+
+        $this->mock(ChargeGenerationService::class, function ($mock) use ($failed, $successful): void {
+            $mock->shouldReceive('generateChargesFromExpense')
+                ->once()
+                ->withArgs(fn (Expense $expense): bool => $expense->is($failed))
+                ->andThrow(new \DomainException('Distribution impossible'));
+            $mock->shouldReceive('generateChargesFromExpense')
+                ->once()
+                ->withArgs(fn (Expense $expense): bool => $expense->is($successful))
+                ->andReturnUsing(function (Expense $expense): \Illuminate\Support\Collection {
+                    $expense->update(['status' => ExpenseStatus::Distributed]);
+
+                    return collect();
+                });
+        });
+
+        Livewire::test(ListExpenses::class)
+            ->callTableBulkAction('distribute_selected_expenses', [$failed, $successful, $distributed])
+            ->assertHasNoTableActionErrors()
+            ->assertNotified('1 gastos distribuidos; 2 omitidos');
+
+        $this->assertSame(ExpenseStatus::Registered, $failed->fresh()->status);
+        $this->assertSame(ExpenseStatus::Distributed, $successful->fresh()->status);
+        $this->assertSame(ExpenseStatus::Distributed, $distributed->fresh()->status);
     }
 }

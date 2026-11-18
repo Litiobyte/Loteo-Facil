@@ -9,9 +9,12 @@ use App\Filament\Admin\Resources\PartnerChargeResource\Pages\ListPartnerCharges;
 use App\Filament\Admin\Resources\PartnerChargeResource\Pages\ViewPartnerCharge;
 use App\Filament\Resources\Propietarios\PropietarioResource;
 use App\Models\PartnerCharge;
+use App\Support\AdminTableColumns;
+use App\Support\ChileanNumber;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
@@ -26,6 +29,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
@@ -41,7 +45,7 @@ class PartnerChargeResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Cobros';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Gastos Comunes';
+    protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
 
     protected static ?int $navigationSort = 10;
 
@@ -59,12 +63,16 @@ class PartnerChargeResource extends Resource
                     ->schema([
                         TextEntry::make('id')
                             ->label('ID del cobro'),
+                        TextEntry::make('consolidation')
+                            ->label('Consolidación')
+                            ->badge()->color('gray')
+                            ->state(fn (PartnerCharge $record): ?string => static::consolidationLabel($record)),
                         TextEntry::make('propietario.nombre_completo')
                             ->label('Propietario')
                             ->url(fn (PartnerCharge $record): string => PropietarioResource::getUrl('edit', ['record' => $record->propietario_id])),
                         TextEntry::make('expense.title')
                             ->label('Gasto relacionado')
-                            ->url(fn (PartnerCharge $record): string => ExpenseResource::getUrl('view', ['record' => $record->expense_id])),
+                            ->url(fn (PartnerCharge $record): ?string => $record->expense_id ? ExpenseResource::getUrl('view', ['record' => $record->expense_id]) : null),
                         TextEntry::make('amount')
                             ->label('Monto del cobro')
                             ->money('CLP', locale: 'es_CL'),
@@ -72,6 +80,7 @@ class PartnerChargeResource extends Resource
                             ->label('Monto pagado')
                             ->money('CLP', locale: 'es_CL'),
                         TextEntry::make('remaining_amount')
+                            ->state(fn (PartnerCharge $record): string => $record->status === ChargeStatus::Consolidated ? '0' : $record->remaining_amount)
                             ->label('Saldo pendiente')
                             ->money('CLP', locale: 'es_CL'),
                         TextEntry::make('status')
@@ -109,6 +118,11 @@ class PartnerChargeResource extends Resource
                             ->label('Notas de cálculo')
                             ->placeholder('-')
                             ->columnSpanFull(),
+                        TextEntry::make('distribution_snapshot.unit')->label('Unidad de distribución')->placeholder('-'),
+                        TextEntry::make('distribution_snapshot.base')->label('Base individual congelada')->placeholder('-'),
+                        TextEntry::make('distribution_snapshot.total_base')->label('Total elegible congelado')->placeholder('-'),
+                        TextEntry::make('distribution_snapshot.quantity')->label('Acciones al emitir')->placeholder('-'),
+                        TextEntry::make('distribution_snapshot.equivalent_square_meters')->label('Superficie equivalente al emitir (m²)')->formatStateUsing(fn (mixed $state): ?string => ChileanNumber::format($state))->placeholder('-'),
                     ]),
                 Section::make('Recaudaciones aplicados')
                     ->columns(1)
@@ -120,7 +134,7 @@ class PartnerChargeResource extends Resource
                             ->html(),
                         TextEntry::make('remaining_amount_summary')
                             ->label('Saldo pendiente actual')
-                            ->state(fn (PartnerCharge $record): string => number_format((float) $record->remaining_amount, 2, ',', '.').' CLP'),
+                            ->state(fn (PartnerCharge $record): string => '$'.number_format($record->status === ChargeStatus::Consolidated ? 0 : (float) $record->remaining_amount, 0, ',', '.')),
                     ]),
                 Section::make('Auditoría')
                     ->columns(2)
@@ -138,9 +152,14 @@ class PartnerChargeResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['propietario', 'expense']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['propietario', 'expense', 'sourceLinks.consolidatedCharge']))
             ->defaultSort('created_at', 'desc')
-            ->columns([
+            ->columns(AdminTableColumns::contentSized([
+                TextColumn::make('consolidation')
+                    ->label('Consolidación')
+                    ->badge()
+                    ->color('gray')
+                    ->state(fn (PartnerCharge $record): ?string => static::consolidationLabel($record)),
                 TextColumn::make('id')
                     ->label('ID')
                     ->sortable(),
@@ -152,7 +171,7 @@ class PartnerChargeResource extends Resource
                     ->sortable(),
                 TextColumn::make('expense.title')
                     ->label('Gasto relacionado')
-                    ->url(fn (PartnerCharge $record): string => ExpenseResource::getUrl('view', ['record' => $record->expense_id]))
+                    ->url(fn (PartnerCharge $record): ?string => $record->expense_id ? ExpenseResource::getUrl('view', ['record' => $record->expense_id]) : null)
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('amount')
@@ -172,12 +191,14 @@ class PartnerChargeResource extends Resource
                             ->money('CLP', locale: 'es_CL'),
                     ),
                 TextColumn::make('remaining_amount')
+                    ->state(fn (PartnerCharge $record): string => $record->status === ChargeStatus::Consolidated ? '0' : $record->remaining_amount)
                     ->label('Saldo pendiente')
                     ->money('CLP', locale: 'es_CL')
                     ->sortable()
                     ->summarize(
                         Sum::make()
-                            ->money('CLP', locale: 'es_CL'),
+                            ->money('CLP', locale: 'es_CL')
+                            ->query(fn (\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Query\Builder => $query->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Partial->value])),
                     ),
                 TextColumn::make('status')
                     ->label('Estado')
@@ -198,10 +219,11 @@ class PartnerChargeResource extends Resource
                     ->date('d/m/Y')
                     ->sortable(),
                 TextColumn::make('created_at')
+                    ->toggleable()
                     ->label('Fecha de creación')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
-            ])
+            ]))
             ->filters([
                 SelectFilter::make('status')
                     ->label('Estado')
@@ -209,6 +231,7 @@ class PartnerChargeResource extends Resource
                         ChargeStatus::Pending->value => 'Pendiente',
                         ChargeStatus::Partial->value => 'Parcial',
                         ChargeStatus::Paid->value => 'Pagado',
+                        ChargeStatus::Consolidated->value => 'Consolidado',
                         'unpaid' => 'Impagos',
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -263,6 +286,8 @@ class PartnerChargeResource extends Resource
                     ->options([
                         ExpenseDistributionType::EqualByPartner->value => 'Partes iguales',
                         ExpenseDistributionType::ProportionalByHectares->value => 'Proporcional por hectáreas',
+                        ExpenseDistributionType::ProportionalByShares->value => 'Proporcional por acciones',
+                        ExpenseDistributionType::ProportionalByEquivalentArea->value => 'Proporcional por superficie equivalente',
                         ExpenseDistributionType::Manual->value => 'Manual',
                     ]),
             ])
@@ -284,12 +309,14 @@ class PartnerChargeResource extends Resource
                     ])),
             ])
             ->toolbarActions([
-                BulkAction::make('export_selected_csv')
-                    ->label('Exportar seleccionados (CSV)')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->requiresConfirmation()
-                    ->deselectRecordsAfterCompletion()
-                    ->action(fn (EloquentCollection $records): StreamedResponse => static::exportSelectedToCsv($records)),
+                BulkActionGroup::make([
+                    BulkAction::make('export_selected_csv')
+                        ->label('Exportar seleccionados (CSV)')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(fn (EloquentCollection $records): StreamedResponse => static::exportSelectedToCsv($records)),
+                ]),
             ]);
     }
 
@@ -377,7 +404,20 @@ class PartnerChargeResource extends Resource
             ChargeStatus::Partial => 'Parcial',
             ChargeStatus::Paid => 'Pagado',
             ChargeStatus::Cancelled => 'Cancelado',
+            ChargeStatus::Consolidated => 'Consolidado',
         };
+    }
+
+    protected static function consolidationLabel(PartnerCharge $record): ?string
+    {
+        $target = $record->status === ChargeStatus::Consolidated
+            ? $record->sourceLinks->first()?->consolidatedCharge
+            : ($record->charge_type === 'balance_consolidation' ? $record : null);
+        if (! $target?->consolidation_year || ! $target->consolidation_month) {
+            return null;
+        }
+
+        return ($record->status === ChargeStatus::Consolidated ? 'Consolidado en ' : 'Saldo ').Carbon::create($target->consolidation_year, $target->consolidation_month, 1)->locale('es')->translatedFormat('F Y');
     }
 
     protected static function getStatusColor(ChargeStatus|string|null $state): string
@@ -389,6 +429,7 @@ class PartnerChargeResource extends Resource
             ChargeStatus::Partial => 'info',
             ChargeStatus::Paid => 'success',
             ChargeStatus::Cancelled => 'danger',
+            ChargeStatus::Consolidated => 'gray',
         };
     }
 
@@ -400,6 +441,8 @@ class PartnerChargeResource extends Resource
             ExpenseDistributionType::EqualByPartner => 'Partes iguales',
             ExpenseDistributionType::ProportionalByHectares => 'Proporcional por hectáreas',
             ExpenseDistributionType::Manual => 'Manual',
+            ExpenseDistributionType::ProportionalByShares => 'Proporcional por acciones',
+            ExpenseDistributionType::ProportionalByEquivalentArea => 'Proporcional por superficie equivalente',
         };
     }
 
@@ -411,6 +454,7 @@ class PartnerChargeResource extends Resource
             ExpenseDistributionType::EqualByPartner => 'info',
             ExpenseDistributionType::ProportionalByHectares => 'warning',
             ExpenseDistributionType::Manual => 'gray',
+            ExpenseDistributionType::ProportionalByShares, ExpenseDistributionType::ProportionalByEquivalentArea => 'success',
         };
     }
 
@@ -486,10 +530,10 @@ class PartnerChargeResource extends Resource
                     : ($paymentMethod ? CollectionMethod::from((string) $paymentMethod)->getLabel() : '-');
 
                 return sprintf(
-                    '<li><strong>%s</strong> · %s · %s CLP · aplicado %s</li>',
+                    '<li><strong>%s</strong> · %s · $%s · aplicado %s</li>',
                     e($paymentDate),
                     e($methodLabel),
-                    e(number_format((float) $allocation->amount, 2, ',', '.')),
+                    e(number_format((float) $allocation->amount, 0, ',', '.')),
                     e($allocation->allocated_at?->format('d/m/Y H:i') ?? '-'),
                 );
             })

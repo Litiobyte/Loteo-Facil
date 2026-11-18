@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\ExpenseCategoryResource\Pages\ManageExpenseCategories;
 use App\Models\ExpenseCategory;
+use App\Support\AdminTableColumns;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -34,7 +35,7 @@ class ExpenseCategoryResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Categorías de gastos';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Gastos Comunes';
+    protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
 
     protected static ?int $navigationSort = 20;
 
@@ -63,14 +64,14 @@ class ExpenseCategoryResource extends Resource
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->withCount('expenses'))
-            ->columns([
+            ->columns(AdminTableColumns::contentSized([
                 TextColumn::make('name')
                     ->label('Nombre')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('description')
                     ->label('Descripción')
-                    ->limit(50)
+                    ->toggleable()
                     ->wrap(),
                 IconColumn::make('is_active')
                     ->label('Activa')
@@ -82,7 +83,7 @@ class ExpenseCategoryResource extends Resource
                     ->label('Creada')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
-            ])
+            ]))
             ->filters([
                 TernaryFilter::make('is_active')
                     ->label('Estado')

@@ -153,7 +153,7 @@ class PartnerStatementService
                 'type' => 'charge',
                 'description' => $charge->description ?? "Cobro #{$charge->id}",
                 'amount' => (float) $charge->amount,
-                'balance_impact' => (float) $charge->amount, // Increases debt
+                'balance_impact' => $charge->charge_type === 'balance_consolidation' ? 0.0 : (float) $charge->amount,
                 'related_id' => $charge->id,
                 'related_type' => 'PartnerCharge',
                 'status' => $charge->status->value,

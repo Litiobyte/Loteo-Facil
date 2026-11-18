@@ -7,13 +7,17 @@ use App\Domain\Expenses\Enums\ExpenseDistributionType;
 use App\Domain\Expenses\Enums\ExpenseStatus;
 use App\Domain\Expenses\Services\ChargeGenerationService;
 use App\Domain\Expenses\Services\ExpenseFundingPaymentService;
+use App\Domain\Expenses\Services\RecurringExpenseService;
 use App\Filament\Admin\Resources\ExpenseResource\Pages\CreateExpense;
 use App\Filament\Admin\Resources\ExpenseResource\Pages\EditExpense;
 use App\Filament\Admin\Resources\ExpenseResource\Pages\ListExpenses;
 use App\Filament\Admin\Resources\ExpenseResource\Pages\ViewExpense;
+use App\Filament\Forms\ChileanNumberInput;
 use App\Models\Expense;
+use App\Support\AdminTableColumns;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -57,7 +61,7 @@ class ExpenseResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Gastos';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Gastos Comunes';
+    protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
 
     protected static ?int $navigationSort = 30;
 
@@ -93,21 +97,32 @@ class ExpenseResource extends Resource
                                     ->default(true)
                                     ->required(),
                             ]),
-                        TextInput::make('amount')
+                        ChileanNumberInput::make('amount')
                             ->label('Monto')
                             ->required()
-                            ->numeric()
                             ->prefix('$')
-                            ->suffix('CLP')
                             ->minValue(1)
-                            ->step(0.01)
                             ->rule('gt:0'),
                         DatePicker::make('expense_date')
                             ->label('Fecha de gasto')
                             ->required()
                             ->native(false)
                             ->displayFormat('d/m/Y')
-                            ->maxDate(now()),
+                            ->maxDate(now())
+                            ->live(),
+                        Toggle::make('is_recurring')
+                            ->label('Gasto mensual (fijo)')
+                            ->default(false)
+                            ->live()
+                            ->disabledOn('edit'),
+                        DatePicker::make('recurrence_end_date')
+                            ->label('Fin de recurrencia')
+                            ->visible(fn (callable $get): bool => (bool) $get('is_recurring'))
+                            ->disabled(fn (string $operation, callable $get): bool => $operation === 'edit' || ! $get('is_recurring'))
+                            ->required(fn (callable $get): bool => (bool) $get('is_recurring'))
+                            ->after('expense_date')
+                            ->maxDate(fn (callable $get): ?Carbon => $get('expense_date') ? Carbon::parse($get('expense_date'))->addMonthsNoOverflow(12)->subDay() : null)
+                            ->helperText('Hasta 12 instancias, incluida la primera.'),
                         DatePicker::make('due_date')
                             ->label('Fecha de vencimiento')
                             ->native(false)
@@ -120,11 +135,7 @@ class ExpenseResource extends Resource
                             ->label('Tipo de distribución')
                             ->required()
                             ->native(false)
-                            ->options([
-                                ExpenseDistributionType::EqualByPartner->value => 'Partes iguales entre propietarios',
-                                ExpenseDistributionType::ProportionalByHectares->value => 'Proporcional por hectáreas',
-                                ExpenseDistributionType::Manual->value => 'Asignación manual',
-                            ])
+                            ->options(fn (): array => ExpenseDistributionType::availableOptions())
                             ->helperText('Define cómo se distribuirá el gasto en Fase 3.'),
                     ]),
                 Section::make('Detalles')
@@ -152,11 +163,9 @@ class ExpenseResource extends Resource
                                 ExpenseStatus::Cancelled->value => 'Cancelado',
                             ])
                             ->disabled(fn (?Expense $record): bool => ! $record || in_array($record->status, [ExpenseStatus::Paid, ExpenseStatus::Cancelled], true)),
-                        TextInput::make('funded_amount')
+                        ChileanNumberInput::make('funded_amount')
                             ->label('Pagado desde caja')
-                            ->numeric()
                             ->prefix('$')
-                            ->suffix('CLP')
                             ->disabled()
                             ->dehydrated(false),
                     ]),
@@ -166,14 +175,18 @@ class ExpenseResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('category')->withCount('charges'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('category')->withCount(['charges', 'children']))
             ->defaultSort('expense_date', 'desc')
-            ->columns([
+            ->columns(AdminTableColumns::contentSized([
+                TextColumn::make('is_recurring')
+                    ->label('Mensual')
+                    ->badge()
+                    ->formatStateUsing(fn (bool $state): string => $state ? 'Mensual' : 'Único')
+                    ->color('gray'),
                 TextColumn::make('title')
                     ->label('Título')
                     ->searchable()
-                    ->sortable()
-                    ->limit(40),
+                    ->sortable(),
                 TextColumn::make('category.name')
                     ->label('Categoría')
                     ->searchable()
@@ -201,11 +214,14 @@ class ExpenseResource extends Resource
                         ExpenseDistributionType::EqualByPartner => 'Partes iguales',
                         ExpenseDistributionType::ProportionalByHectares => 'Por hectáreas',
                         ExpenseDistributionType::Manual => 'Manual',
+                        ExpenseDistributionType::ProportionalByShares => 'Por acciones',
+                        ExpenseDistributionType::ProportionalByEquivalentArea => 'Por superficie equivalente',
                     })
                     ->color(fn (ExpenseDistributionType|string|null $state): string => match ($state instanceof ExpenseDistributionType ? $state : ExpenseDistributionType::from((string) $state)) {
                         ExpenseDistributionType::EqualByPartner => 'info',
                         ExpenseDistributionType::ProportionalByHectares => 'warning',
                         ExpenseDistributionType::Manual => 'gray',
+                        ExpenseDistributionType::ProportionalByShares, ExpenseDistributionType::ProportionalByEquivalentArea => 'success',
                     }),
                 TextColumn::make('status')
                     ->label('Estado')
@@ -277,7 +293,7 @@ class ExpenseResource extends Resource
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-            ])
+            ]))
             ->filters([
                 SelectFilter::make('expense_category_id')
                     ->label('Categoría')
@@ -299,6 +315,8 @@ class ExpenseResource extends Resource
                     ->options([
                         ExpenseDistributionType::EqualByPartner->value => 'Partes iguales entre propietarios',
                         ExpenseDistributionType::ProportionalByHectares->value => 'Proporcional por hectáreas',
+                        ExpenseDistributionType::ProportionalByShares->value => 'Proporcional por acciones',
+                        ExpenseDistributionType::ProportionalByEquivalentArea->value => 'Proporcional por superficie equivalente',
                         ExpenseDistributionType::Manual->value => 'Asignación manual',
                     ]),
                 Filter::make('expense_date_range')
@@ -334,196 +352,226 @@ class ExpenseResource extends Resource
                     }),
             ])
             ->recordActions([
-                ViewAction::make(),
-                Action::make('duplicate_expense')
-                    ->label('Duplicar gasto')
-                    ->icon('heroicon-o-document-duplicate')
-                    ->color('gray')
-                    ->authorize(fn (): bool => static::canAccess())
-                    ->modalHeading('Duplicar gasto')
-                    ->modalDescription('Crea un nuevo gasto en estado registrado copiando este registro.')
-                    ->modalSubmitActionLabel('Duplicar')
-                    ->requiresConfirmation()
-                    ->form([
-                        DatePicker::make('expense_date')
-                            ->label('Nueva fecha de gasto')
-                            ->required()
-                            ->native(false)
-                            ->displayFormat('d/m/Y')
-                            ->default(fn (Expense $record): string => Carbon::parse($record->expense_date)->addMonthNoOverflow()->toDateString()),
-                        DatePicker::make('due_date')
-                            ->label('Nueva fecha de vencimiento')
-                            ->native(false)
-                            ->displayFormat('d/m/Y')
-                            ->default(fn (Expense $record): ?string => $record->due_date
-                                ? Carbon::parse($record->due_date)->addMonthNoOverflow()->toDateString()
-                                : null)
-                            ->afterOrEqual('expense_date'),
-                        TextInput::make('amount')
-                            ->label('Monto')
-                            ->required()
-                            ->numeric()
-                            ->minValue(1)
-                            ->step(0.01)
-                            ->prefix('$')
-                            ->suffix('CLP')
-                            ->default(fn (Expense $record): float => (float) $record->amount),
-                    ])
-                    ->action(function (Expense $record, array $data): void {
-                        try {
-                            static::duplicateExpense($record, $data);
-
-                            Notification::make()
-                                ->title('Gasto duplicado exitosamente')
-                                ->success()
-                                ->send();
-                        } catch (\Throwable $exception) {
-                            Notification::make()
-                                ->title('No se pudo duplicar el gasto')
-                                ->body($exception->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                Action::make('distribute_expense')
-                    ->label('Distribuir gasto')
-                    ->icon('heroicon-o-calculator')
-                    ->color('success')
-                    ->authorize(fn (): bool => static::canAccess())
-                    ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Registered)
-                    ->modalHeading('Distribuir gasto entre propietarios')
-                    ->modalDescription(fn (Expense $record): string => "Se generarán cobros automáticos para este gasto de \${$record->amount} CLP según el método de distribución configurado: {$record->distribution_type->getLabel()}.")
-                    ->modalSubmitActionLabel('Distribuir y generar cobros')
-                    ->requiresConfirmation()
-                    ->action(function (Expense $record): void {
-                        try {
-                            $service = app(ChargeGenerationService::class);
-                            $charges = $service->generateChargesFromExpense($record);
-
-                            Notification::make()
-                                ->title('Gasto distribuido exitosamente')
-                                ->body("Se generaron {$charges->count()} cobros para los propietarios activos.")
-                                ->success()
-                                ->send();
-                        } catch (\DomainException $exception) {
-                            Notification::make()
-                                ->title('No se pudo distribuir el gasto')
-                                ->body($exception->getMessage())
-                                ->danger()
-                                ->send();
-                        } catch (\Throwable $exception) {
-                            Notification::make()
-                                ->title('Error inesperado al distribuir')
-                                ->body($exception->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                Action::make('register_funding_payment')
-                    ->label('Registrar pago de gasto')
-                    ->icon('heroicon-o-banknotes')
-                    ->color('primary')
-                    ->authorize(fn (): bool => static::canAccess())
-                    ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Distributed)
-                    ->modalHeading('Registrar pago desde caja')
-                    ->modalDescription(function (Expense $record): string {
-                        $pending = max(0, round((float) $record->amount - (float) $record->funded_amount, 2));
-                        $availableCash = app(CashBalanceService::class)->getAvailableCash();
-
-                        return 'Saldo pendiente: $'.number_format($pending, 0, ',', '.').' CLP | Caja disponible: $'.number_format($availableCash, 0, ',', '.').' CLP';
-                    })
-                    ->modalSubmitActionLabel('Registrar pago')
-                    ->requiresConfirmation()
-                    ->form([
-                        TextInput::make('amount')
-                            ->label('Monto a pagar desde caja')
-                            ->required()
-                            ->numeric()
-                            ->minValue(0.01)
-                            ->step(0.01)
-                            ->prefix('$')
-                            ->suffix('CLP'),
-                        Placeholder::make('cash_projection_alert')
-                            ->label('Validación de caja')
-                            ->content(function (callable $get): string {
-                                $amount = round((float) ($get('amount') ?? 0), 2);
-                                $projectedCash = app(CashBalanceService::class)->getProjectedCashAfterFunding($amount);
-
-                                if ($amount <= 0) {
-                                    return 'Ingrese un monto para ver la proyección de caja.';
-                                }
-
-                                if ($projectedCash < 0) {
-                                    return 'ALERTA: La caja proyectada quedará negativa en $'.number_format(abs($projectedCash), 0, ',', '.').' CLP.';
-                                }
-
-                                return 'Caja proyectada después del pago: $'.number_format($projectedCash, 0, ',', '.').' CLP.';
-                            }),
-                        Checkbox::make('confirm_negative_cash')
-                            ->label('Estoy seguro de continuar aunque la caja quede negativa')
-                            ->inline(false)
-                            ->accepted(fn (callable $get): bool => app(CashBalanceService::class)->getProjectedCashAfterFunding((float) ($get('amount') ?? 0)) < 0)
-                            ->visible(fn (callable $get): bool => app(CashBalanceService::class)->getProjectedCashAfterFunding((float) ($get('amount') ?? 0)) < 0)
-                            ->validationMessages([
-                                'accepted' => 'Debe confirmar explícitamente para registrar un pago que deja caja negativa.',
-                            ]),
-                    ])
-                    ->action(function (Expense $record, array $data): void {
-                        try {
-                            $amount = (float) ($data['amount'] ?? 0);
-                            $projectedCash = app(CashBalanceService::class)->getProjectedCashAfterFunding($amount);
-                            $allowNegativeCash = (bool) ($data['confirm_negative_cash'] ?? false);
-
-                            if ($projectedCash < 0 && ! $allowNegativeCash) {
-                                throw ValidationException::withMessages([
-                                    'confirm_negative_cash' => 'La caja quedará negativa. Debe confirmar para continuar.',
-                                ]);
+                ActionGroup::make([
+                    ViewAction::make(),
+                    Action::make('cancel_future_instances')
+                        ->label('Cancelar futuras')
+                        ->color('danger')
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->visible(fn (Expense $record): bool => static::canAccess() && $record->is_recurring && $record->parent_expense_id === null && $record->children_count > 0)
+                        ->requiresConfirmation()
+                        ->modalDescription('Se cancelarán solo las instancias registradas de esta serie.')
+                        ->action(function (Expense $record): void {
+                            try {
+                                app(RecurringExpenseService::class)->cancelFutureInstances($record);
+                                Notification::make()->title('Instancias futuras canceladas')->success()->send();
+                            } catch (\DomainException $exception) {
+                                Notification::make()->title('No se pudo cancelar')->body($exception->getMessage())->danger()->send();
                             }
+                        }),
+                    Action::make('edit_future_instances')
+                        ->label('Editar futuras')
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->visible(fn (Expense $record): bool => static::canAccess() && $record->is_recurring && $record->parent_expense_id === null && $record->children_count > 0)
+                        ->requiresConfirmation()
+                        ->modalDescription('Se actualizarán solo las instancias registradas. El vencimiento indicado se aplicará a todas ellas.')
+                        ->schema([
+                            ChileanNumberInput::make('amount')->label('Monto')->required()->minValue(1)->default(fn (Expense $record): string => $record->amount),
+                            DatePicker::make('due_date')->label('Vencimiento común')->required(),
+                            Textarea::make('notes')->label('Notas')->maxLength(2000)->default(fn (Expense $record): ?string => $record->notes),
+                        ])
+                        ->action(function (Expense $record, array $data): void {
+                            try {
+                                app(RecurringExpenseService::class)->updateFutureInstances($record, $data);
+                                Notification::make()->title('Instancias futuras actualizadas')->success()->send();
+                            } catch (\DomainException $exception) {
+                                Notification::make()->title('No se pudo actualizar')->body($exception->getMessage())->danger()->send();
+                            }
+                        }),
+                    Action::make('duplicate_expense')
+                        ->label('Duplicar gasto')
+                        ->icon('heroicon-o-document-duplicate')
+                        ->color('gray')
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->modalHeading('Duplicar gasto')
+                        ->modalDescription('Crea un nuevo gasto en estado registrado copiando este registro.')
+                        ->modalSubmitActionLabel('Duplicar')
+                        ->requiresConfirmation()
+                        ->form([
+                            DatePicker::make('expense_date')
+                                ->label('Nueva fecha de gasto')
+                                ->required()
+                                ->native(false)
+                                ->displayFormat('d/m/Y')
+                                ->default(fn (Expense $record): string => Carbon::parse($record->expense_date)->addMonthNoOverflow()->toDateString()),
+                            DatePicker::make('due_date')
+                                ->label('Nueva fecha de vencimiento')
+                                ->native(false)
+                                ->displayFormat('d/m/Y')
+                                ->default(fn (Expense $record): ?string => $record->due_date
+                                    ? Carbon::parse($record->due_date)->addMonthNoOverflow()->toDateString()
+                                    : null)
+                                ->afterOrEqual('expense_date'),
+                            ChileanNumberInput::make('amount')
+                                ->label('Monto')
+                                ->required()
+                                ->minValue(1)
+                                ->prefix('$')
+                                ->default(fn (Expense $record): float => (float) $record->amount),
+                        ])
+                        ->action(function (Expense $record, array $data): void {
+                            try {
+                                static::duplicateExpense($record, $data);
 
-                            app(ExpenseFundingPaymentService::class)->register(
-                                expense: $record,
-                                amount: $amount,
-                                paymentDate: now()->toDateString(),
-                                notes: 'Registro desde acción rápida de gasto',
-                                allowNegativeCash: $allowNegativeCash,
-                            );
+                                Notification::make()
+                                    ->title('Gasto duplicado exitosamente')
+                                    ->success()
+                                    ->send();
+                            } catch (\Throwable $exception) {
+                                Notification::make()
+                                    ->title('No se pudo duplicar el gasto')
+                                    ->body($exception->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+                    Action::make('distribute_expense')
+                        ->label('Distribuir gasto')
+                        ->icon('heroicon-o-calculator')
+                        ->color('success')
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Registered)
+                        ->modalHeading('Distribuir gasto entre propietarios')
+                        ->modalDescription(fn (Expense $record): string => 'Se generarán cobros automáticos para este gasto de $'.number_format((float) $record->amount, 0, ',', '.')." según el método de distribución configurado: {$record->distribution_type->getLabel()}.")
+                        ->modalSubmitActionLabel('Distribuir y generar cobros')
+                        ->requiresConfirmation()
+                        ->action(function (Expense $record): void {
+                            try {
+                                $service = app(ChargeGenerationService::class);
+                                $charges = $service->generateChargesFromExpense($record);
 
-                            $updated = $record->fresh();
+                                Notification::make()
+                                    ->title('Gasto distribuido exitosamente')
+                                    ->body("Se generaron {$charges->count()} cobros para los propietarios activos.")
+                                    ->success()
+                                    ->send();
+                            } catch (\DomainException $exception) {
+                                Notification::make()
+                                    ->title('No se pudo distribuir el gasto')
+                                    ->body($exception->getMessage())
+                                    ->danger()
+                                    ->send();
+                            } catch (\Throwable $exception) {
+                                Notification::make()
+                                    ->title('Error inesperado al distribuir')
+                                    ->body($exception->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+                    Action::make('register_funding_payment')
+                        ->label('Registrar pago de gasto')
+                        ->icon('heroicon-o-banknotes')
+                        ->color('primary')
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Distributed)
+                        ->modalHeading('Registrar pago desde caja')
+                        ->modalDescription(function (Expense $record): string {
+                            $pending = max(0, round((float) $record->amount - (float) $record->funded_amount, 2));
+                            $availableCash = app(CashBalanceService::class)->getAvailableCash();
 
-                            $remaining = max(0, round((float) $updated->amount - (float) $updated->funded_amount, 2));
-                            $cashAfter = app(CashBalanceService::class)->getAvailableCash();
+                            return 'Saldo pendiente: $'.number_format($pending, 0, ',', '.').' | Caja disponible: $'.number_format($availableCash, 0, ',', '.');
+                        })
+                        ->modalSubmitActionLabel('Registrar pago')
+                        ->requiresConfirmation()
+                        ->form([
+                            ChileanNumberInput::make('amount')
+                                ->label('Monto a pagar desde caja')
+                                ->required()
+                                ->minValue(0.01)
+                                ->prefix('$'),
+                            Placeholder::make('cash_projection_alert')
+                                ->label('Validación de caja')
+                                ->content(function (callable $get): string {
+                                    $amount = round((float) ($get('amount') ?? 0), 2);
+                                    $projectedCash = app(CashBalanceService::class)->getProjectedCashAfterFunding($amount);
 
-                            Notification::make()
-                                ->title('Recaudacion registrado desde caja')
-                                ->body('Pagado acumulado: $'.number_format((float) $updated->funded_amount, 0, ',', '.').' CLP. Saldo pendiente: $'.number_format($remaining, 0, ',', '.').' CLP. Caja disponible actual: $'.number_format($cashAfter, 0, ',', '.').' CLP.')
-                                ->success()
-                                ->send();
-                        } catch (ValidationException $exception) {
-                            throw $exception;
-                        } catch (\DomainException $exception) {
-                            Notification::make()
-                                ->title('No se pudo registrar el pago')
-                                ->body($exception->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                EditAction::make()
-                    ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Registered),
-                Action::make('cancel_expense')
-                    ->label('Cancelar gasto')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Registered)
-                    ->action(function (Expense $record): void {
-                        $record->update([
-                            'status' => ExpenseStatus::Cancelled,
-                        ]);
-                    }),
-                DeleteAction::make()
-                    ->requiresConfirmation()
-                    ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Registered),
+                                    if ($amount <= 0) {
+                                        return 'Ingrese un monto para ver la proyección de caja.';
+                                    }
+
+                                    if ($projectedCash < 0) {
+                                        return 'ALERTA: La caja proyectada quedará negativa en $'.number_format(abs($projectedCash), 0, ',', '.').'.';
+                                    }
+
+                                    return 'Caja proyectada después del pago: $'.number_format($projectedCash, 0, ',', '.').'.';
+                                }),
+                            Checkbox::make('confirm_negative_cash')
+                                ->label('Estoy seguro de continuar aunque la caja quede negativa')
+                                ->inline(false)
+                                ->accepted(fn (callable $get): bool => app(CashBalanceService::class)->getProjectedCashAfterFunding((float) ($get('amount') ?? 0)) < 0)
+                                ->visible(fn (callable $get): bool => app(CashBalanceService::class)->getProjectedCashAfterFunding((float) ($get('amount') ?? 0)) < 0)
+                                ->validationMessages([
+                                    'accepted' => 'Debe confirmar explícitamente para registrar un pago que deja caja negativa.',
+                                ]),
+                        ])
+                        ->action(function (Expense $record, array $data): void {
+                            try {
+                                $amount = (float) ($data['amount'] ?? 0);
+                                $projectedCash = app(CashBalanceService::class)->getProjectedCashAfterFunding($amount);
+                                $allowNegativeCash = (bool) ($data['confirm_negative_cash'] ?? false);
+
+                                if ($projectedCash < 0 && ! $allowNegativeCash) {
+                                    throw ValidationException::withMessages([
+                                        'confirm_negative_cash' => 'La caja quedará negativa. Debe confirmar para continuar.',
+                                    ]);
+                                }
+
+                                app(ExpenseFundingPaymentService::class)->register(
+                                    expense: $record,
+                                    amount: $amount,
+                                    paymentDate: now()->toDateString(),
+                                    notes: 'Registro desde acción rápida de gasto',
+                                    allowNegativeCash: $allowNegativeCash,
+                                );
+
+                                $updated = $record->fresh();
+
+                                $remaining = max(0, round((float) $updated->amount - (float) $updated->funded_amount, 2));
+                                $cashAfter = app(CashBalanceService::class)->getAvailableCash();
+
+                                Notification::make()
+                                    ->title('Recaudacion registrado desde caja')
+                                    ->body('Pagado acumulado: $'.number_format((float) $updated->funded_amount, 0, ',', '.').'. Saldo pendiente: $'.number_format($remaining, 0, ',', '.').'. Caja disponible actual: $'.number_format($cashAfter, 0, ',', '.').'.')
+                                    ->success()
+                                    ->send();
+                            } catch (ValidationException $exception) {
+                                throw $exception;
+                            } catch (\DomainException $exception) {
+                                Notification::make()
+                                    ->title('No se pudo registrar el pago')
+                                    ->body($exception->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+                    EditAction::make()
+                        ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Registered),
+                    Action::make('cancel_expense')
+                        ->label('Cancelar gasto')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Registered)
+                        ->action(function (Expense $record): void {
+                            $record->update([
+                                'status' => ExpenseStatus::Cancelled,
+                            ]);
+                        }),
+                    DeleteAction::make()
+                        ->requiresConfirmation()
+                        ->visible(fn (Expense $record): bool => $record->status === ExpenseStatus::Registered),
+                ]),
             ])
             ->checkIfRecordIsSelectableUsing(
                 fn (Expense $record): bool => in_array($record->status, [
@@ -563,7 +611,6 @@ class ExpenseResource extends Resource
                             TextInput::make('percentage_adjustment')
                                 ->label('Porcentaje de ajuste (%)')
                                 ->numeric()
-                                ->step(0.01)
                                 ->default(0)
                                 ->visible(fn (callable $get): bool => $get('amount_mode') === 'percentage')
                                 ->required(fn (callable $get): bool => $get('amount_mode') === 'percentage'),
@@ -608,11 +655,79 @@ class ExpenseResource extends Resource
                                     ->send();
                             }
                         }),
-                    DeleteBulkAction::make()
+                    BulkAction::make('distribute_selected_expenses')
+                        ->label('Distribuir seleccionados')
+                        ->icon('heroicon-o-calculator')
+                        ->color('success')
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->modalHeading('Distribuir gastos seleccionados entre propietarios')
+                        ->modalDescription('Se generarán cobros solo para los gastos registrados, según su método de distribución. Los demás se omitirán.')
+                        ->modalSubmitActionLabel('Distribuir y generar cobros')
                         ->requiresConfirmation()
-                        ->authorizeIndividualRecords('delete'),
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (EloquentCollection $records): void {
+                            static::processRegisteredExpenses(
+                                $records,
+                                fn (Expense $record) => app(ChargeGenerationService::class)->generateChargesFromExpense($record),
+                                'distribuidos',
+                            );
+                        }),
+                    BulkAction::make('cancel_selected_expenses')
+                        ->label('Cancelar seleccionados')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->modalDescription('Se cancelarán solo los gastos registrados. Los demás se omitirán.')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (EloquentCollection $records): void {
+                            static::processRegisteredExpenses(
+                                $records,
+                                fn (Expense $record): bool => $record->update(['status' => ExpenseStatus::Cancelled]),
+                                'cancelados',
+                            );
+                        }),
+                    DeleteBulkAction::make('delete_selected_expenses')
+                        ->label('Eliminar seleccionados')
+                        ->authorize(fn (): bool => static::canAccess())
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->authorizeIndividualRecords(fn (Expense $record): bool => static::canDelete($record))
+                        ->missingBulkAuthorizationFailureNotificationMessage('Se omitieron los gastos que no están registrados o no tiene permiso para eliminar.'),
                 ]),
             ]);
+    }
+
+    protected static function processRegisteredExpenses(EloquentCollection $records, callable $process, string $resultLabel): void
+    {
+        $processed = 0;
+        $omitted = [];
+
+        foreach ($records as $record) {
+            try {
+                DB::transaction(function () use ($record, $process): void {
+                    $record = Expense::query()->lockForUpdate()->findOrFail($record->getKey());
+
+                    if ($record->status !== ExpenseStatus::Registered) {
+                        throw new \DomainException("Estado {$record->status->value}: solo se permiten gastos registrados.");
+                    }
+
+                    if ($process($record) === false) {
+                        throw new \DomainException('No se pudo actualizar el gasto.');
+                    }
+                });
+
+                $processed++;
+            } catch (\Throwable $exception) {
+                $omitted[] = "#{$record->getKey()} {$record->title}: {$exception->getMessage()}";
+            }
+        }
+
+        Notification::make()
+            ->title("{$processed} gastos {$resultLabel}; ".count($omitted).' omitidos')
+            ->body($omitted ? implode("\n", $omitted) : 'Todos los gastos seleccionados fueron procesados.')
+            ->status($omitted ? 'warning' : 'success')
+            ->send();
     }
 
     /**

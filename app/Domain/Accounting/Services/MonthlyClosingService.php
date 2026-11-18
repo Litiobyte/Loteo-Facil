@@ -46,6 +46,7 @@ class MonthlyClosingService
                 throw new DomainException('El período ya está cerrado.');
             }
 
+            $processing = app(ClosingProcessingService::class)->processPending($period);
             $consistency = $this->validateGlobalConsistency();
 
             if (! $consistency['valid']) {
@@ -53,6 +54,11 @@ class MonthlyClosingService
             }
 
             $snapshotData = $this->buildSnapshotData($period);
+            $previousMetadata = $period->snapshot?->metadata ?? [];
+            foreach (['processed_expenses', 'consolidated'] as $key) {
+                $processing[$key] = array_merge($previousMetadata[$key] ?? [], $processing[$key]);
+            }
+            $snapshotData['metadata'] = array_merge($snapshotData['metadata'], $processing);
 
             AccountingPeriodSnapshot::query()->updateOrCreate(
                 ['accounting_period_id' => $period->id],
@@ -83,14 +89,28 @@ class MonthlyClosingService
             throw new DomainException('El período ya está abierto.');
         }
 
-        $period->update([
-            'status' => AccountingPeriodStatus::Open,
-            'reopened_at' => now(),
-            'reopened_by' => $userId,
-            'reopen_reason' => trim($reason),
-        ]);
+        return DB::transaction(function () use ($period, $reason, $userId): AccountingPeriod {
+            $period = AccountingPeriod::query()->lockForUpdate()->findOrFail($period->id);
+            if ($period->status !== AccountingPeriodStatus::Closed) {
+                throw new DomainException('El período ya está abierto.');
+            }
+            $consolidations = PartnerCharge::query()->where('charge_type', 'balance_consolidation')
+                ->where('consolidation_year', $period->year)->where('consolidation_month', $period->month)
+                ->lockForUpdate()->get();
+            foreach ($consolidations as $charge) {
+                if ((float) $charge->paid_amount > 0 || $charge->allocations()->exists() || $charge->sourceLinks()->exists()) {
+                    throw new DomainException('No se puede reabrir: existen pagos, asignaciones o consolidaciones posteriores; revise las dependencias del cobro consolidado.');
+                }
+            }
+            $period->update([
+                'status' => AccountingPeriodStatus::Open,
+                'reopened_at' => now(),
+                'reopened_by' => $userId,
+                'reopen_reason' => trim($reason),
+            ]);
 
-        return $period->fresh(['snapshot']) ?? $period;
+            return $period->fresh(['snapshot']) ?? $period;
+        });
     }
 
     public function isDateInClosedPeriod(CarbonInterface|string|null $date): bool
@@ -205,6 +225,17 @@ class MonthlyClosingService
             $errors[] = 'Inconsistencia global entre pagos aplicados y asignaciones registradas.';
         }
 
+        foreach (PartnerCharge::query()->where('charge_type', 'balance_consolidation')->with(['consolidationLinks'])->get() as $charge) {
+            $linkedCents = $charge->consolidationLinks->sum(fn ($link): int => (int) round((float) $link->transferred_amount * 100));
+            if ($linkedCents !== (int) round((float) $charge->amount * 100)) {
+                $errors[] = "La consolidación #{$charge->id} no coincide con sus vínculos.";
+            }
+        }
+        if (DB::table('partner_charge_consolidation_links as links')->join('partner_charges as source', 'source.id', '=', 'links.source_charge_id')
+            ->where('source.status', '!=', ChargeStatus::Consolidated->value)->exists()) {
+            $errors[] = 'Existe un vínculo cuyo cobro de origen no está consolidado.';
+        }
+
         return [
             'valid' => $errors === [],
             'errors' => $errors,
@@ -246,9 +277,7 @@ class MonthlyClosingService
         $start = Carbon::parse($period->period_start)->startOfDay();
         $end = Carbon::parse($period->period_end)->endOfDay();
 
-        $totalCharges = (float) PartnerCharge::query()
-            ->whereBetween('created_at', [$start, $end])
-            ->sum('amount');
+        $totalCharges = (float) $this->chargesForPeriod($period)->sum('amount');
 
         $totalCollections = (float) Collection::query()
             ->where('status', '!=', CollectionStatus::Cancelled->value)
@@ -260,14 +289,14 @@ class MonthlyClosingService
             ->sum('amount');
 
         $pendingBalance = (float) PartnerCharge::query()
-            ->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Partial->value])
+            ->unpaid()
             ->sum('remaining_amount');
 
         $creditBalance = (float) Collection::query()
             ->whereIn('status', [CollectionStatus::PendingApplication->value, CollectionStatus::PartiallyApplied->value])
             ->sum('unapplied_amount');
 
-        $aging = $this->calculateAgingBuckets();
+        $aging = $this->calculateAgingBuckets($end);
 
         return [
             'total_charges' => round($totalCharges, 2),
@@ -289,7 +318,7 @@ class MonthlyClosingService
     /**
      * @return array{overdue_1_30: float, overdue_31_60: float, overdue_61_90: float, overdue_90_plus: float}
      */
-    private function calculateAgingBuckets(): array
+    private function calculateAgingBuckets(Carbon $cutoff): array
     {
         $buckets = [
             'overdue_1_30' => 0.0,
@@ -300,15 +329,15 @@ class MonthlyClosingService
 
         $charges = PartnerCharge::query()
             ->whereNotNull('due_date')
-            ->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Partial->value])
+            ->unpaid()
             ->get(['remaining_amount', 'due_date']);
 
         foreach ($charges as $charge) {
-            if (! $charge->due_date || $charge->due_date->isToday() || $charge->due_date->isFuture()) {
+            if (! $charge->due_date || $charge->due_date->startOfDay()->gte($cutoff->copy()->startOfDay())) {
                 continue;
             }
 
-            $daysOverdue = $charge->due_date->startOfDay()->diffInDays(now()->startOfDay());
+            $daysOverdue = $charge->due_date->startOfDay()->diffInDays($cutoff->copy()->startOfDay());
             $amount = round((float) $charge->getRawOriginal('remaining_amount'), 2);
 
             if ($daysOverdue <= 30) {
@@ -331,6 +360,10 @@ class MonthlyClosingService
     }
 
     /**
+     * Las consolidaciones son transferencias informativas, no nueva deuda:
+     * débito cero y referencias a los saldos transferidos. Los cobros originales
+     * conservan su monto íntegro; no se alteran importes ni invariantes del dominio.
+     *
      * @return SupportCollection<int, array{movement_type: string, movement_date: string, owner_name: string, reference: string, debit: float, credit: float, running_balance: float, status: string}>
      */
     private function buildExportRows(AccountingPeriod $period): SupportCollection
@@ -340,21 +373,24 @@ class MonthlyClosingService
 
         $rows = collect();
 
-        $charges = PartnerCharge::query()
-            ->with('propietario')
-            ->whereBetween('created_at', [$start, $end])
-            ->get();
+        $charges = $this->chargesForPeriod($period);
+        $charges->load('consolidationLinks');
 
         foreach ($charges as $charge) {
+            $isConsolidation = $charge->charge_type === 'balance_consolidation';
+            $reference = 'Cobro #'.$charge->id;
+            if ($isConsolidation) {
+                $reference .= ' - '.$charge->consolidationLinks->map(fn ($link): string => 'Origen #'.$link->source_charge_id.': '.$link->transferred_amount)->implode('; ');
+            }
             $rows->push([
-                'movement_type' => 'Cobro emitido',
-                'movement_date' => $charge->created_at?->format('Y-m-d H:i:s') ?? '-',
+                'movement_type' => $isConsolidation ? 'Consolidación de saldo' : 'Cobro emitido',
+                'movement_date' => $this->chargeImputationDate($charge, $period)->format('Y-m-d'),
                 'owner_name' => $charge->propietario?->nombre_completo ?? '-',
-                'reference' => 'Cobro #'.$charge->id,
-                'debit' => round((float) $charge->amount, 2),
+                'reference' => $reference,
+                'debit' => $isConsolidation ? 0.0 : round((float) $charge->amount, 2),
                 'credit' => 0.0,
                 'status' => $charge->status->value,
-                'sort_key' => $charge->created_at?->timestamp ?? 0,
+                'sort_key' => $this->chargeImputationDate($charge, $period)->timestamp,
             ]);
         }
 
@@ -418,5 +454,33 @@ class MonthlyClosingService
                 'status' => $row['status'],
             ];
         });
+    }
+
+    private function chargesForPeriod(AccountingPeriod $period): SupportCollection
+    {
+        $start = $period->period_start->copy()->startOfDay();
+        $end = $period->period_end->copy()->endOfDay();
+
+        return PartnerCharge::query()->with(['propietario', 'expense'])->get()->filter(function (PartnerCharge $charge) use ($period, $start, $end): bool {
+            $date = $this->chargeImputationDate($charge, $period);
+
+            return $date->betweenIncluded($start, $end);
+        });
+    }
+
+    private function chargeImputationDate(PartnerCharge $charge, AccountingPeriod $period): Carbon
+    {
+        if ($charge->imputation_date !== null) {
+            return $charge->imputation_date->copy()->startOfDay();
+        }
+        $due = $charge->expense?->due_date;
+        if ($due === null) {
+            return $charge->created_at->copy();
+        }
+        if ($due->format('Y-m') === $period->period_end->format('Y-m') && $charge->created_at->gt($period->period_end->copy()->endOfDay())) {
+            return $period->period_end->copy()->startOfDay();
+        }
+
+        return $due->copy()->startOfDay();
     }
 }

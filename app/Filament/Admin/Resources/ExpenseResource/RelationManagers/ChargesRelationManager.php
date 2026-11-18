@@ -30,15 +30,15 @@ class ChargesRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('amount')
                     ->label('Monto')
-                    ->money('CLP')
+                    ->money('CLP', locale: 'es_CL')
                     ->sortable(),
                 TextColumn::make('paid_amount')
                     ->label('Pagado')
-                    ->money('CLP')
+                    ->money('CLP', locale: 'es_CL')
                     ->sortable(),
                 TextColumn::make('remaining_amount')
                     ->label('Saldo')
-                    ->money('CLP')
+                    ->money('CLP', locale: 'es_CL')
                     ->sortable(),
                 TextColumn::make('status')
                     ->label('Estado')
@@ -48,12 +48,14 @@ class ChargesRelationManager extends RelationManager
                         ChargeStatus::Partial => 'Parcial',
                         ChargeStatus::Paid => 'Pagado',
                         ChargeStatus::Cancelled => 'Cancelado',
+                        ChargeStatus::Consolidated => 'Consolidado',
                     })
                     ->color(fn (ChargeStatus $state): string => match ($state) {
                         ChargeStatus::Pending => 'warning',
                         ChargeStatus::Partial => 'info',
                         ChargeStatus::Paid => 'success',
                         ChargeStatus::Cancelled => 'danger',
+                        ChargeStatus::Consolidated => 'gray',
                     }),
                 TextColumn::make('calculation_type')
                     ->label('Tipo de cálculo')
@@ -62,6 +64,8 @@ class ChargesRelationManager extends RelationManager
                         ExpenseDistributionType::EqualByPartner => 'Partes iguales',
                         ExpenseDistributionType::ProportionalByHectares => 'Proporcional',
                         ExpenseDistributionType::Manual => 'Manual',
+                        ExpenseDistributionType::ProportionalByShares => 'Por acciones',
+                        ExpenseDistributionType::ProportionalByEquivalentArea => 'Por superficie equivalente',
                     })
                     ->color('gray'),
                 TextColumn::make('percentage_applied')

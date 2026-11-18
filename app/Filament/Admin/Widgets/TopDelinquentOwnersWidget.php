@@ -14,7 +14,10 @@ class TopDelinquentOwnersWidget extends Widget
 
     protected string $view = 'filament.admin.widgets.top-delinquent-owners-widget';
 
-    protected int|string|array $columnSpan = 4;
+    protected int|string|array $columnSpan = [
+        'md' => 4,
+        '2xl' => 7,
+    ];
 
     protected ?string $pollingInterval = '60s';
 

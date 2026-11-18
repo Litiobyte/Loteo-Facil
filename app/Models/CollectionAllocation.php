@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Accounting\Services\MonthlyClosingService;
+use App\Domain\Charges\Enums\ChargeStatus;
 use Database\Factories\CollectionAllocationFactory;
 use DomainException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -61,6 +62,10 @@ class CollectionAllocation extends Model
 
             if ($payment->propietario_id !== $charge->propietario_id) {
                 throw new DomainException('El pago y el cobro deben pertenecer al mismo propietario.');
+            }
+
+            if (! $allocation->exists && ! in_array($charge->status, [ChargeStatus::Pending, ChargeStatus::Partial], true)) {
+                throw new DomainException('El cobro no está pendiente de pago.');
             }
 
             if ((float) $allocation->amount > (float) $payment->unapplied_amount) {

@@ -5,18 +5,45 @@ namespace Tests\Feature;
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Domain\Expenses\Enums\ExpenseDistributionType;
 use App\Filament\Admin\Resources\PartnerChargeResource;
+use App\Filament\Admin\Resources\PartnerChargeResource\Pages\ListPartnerCharges;
+use App\Filament\Admin\Resources\PartnerChargeResource\Pages\ViewPartnerCharge;
 use App\Models\Expense;
 use App\Models\PartnerCharge;
 use App\Models\Propietario;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Filament\PanelRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class FilamentPartnerChargeResourceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_consolidated_status_renders_without_unhandled_match(): void
+    {
+        Role::findOrCreate('admin', 'web');
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $charge = $this->createPartnerCharge();
+        $charge->update(['status' => ChargeStatus::Consolidated]);
+        $balance = PartnerCharge::factory()->create([
+            'propietario_id' => $charge->propietario_id,
+            'expense_id' => null,
+            'charge_type' => 'balance_consolidation',
+            'consolidation_year' => 2026,
+            'consolidation_month' => 10,
+        ]);
+        $balance->consolidationLinks()->create(['source_charge_id' => $charge->id, 'transferred_amount' => $charge->remaining_amount]);
+        Livewire::test(ListPartnerCharges::class)
+            ->assertCanSeeTableRecords([$charge, $balance])->assertSee('Consolidado en octubre 2026')->assertSee('Saldo octubre 2026');
+        Livewire::test(ViewPartnerCharge::class, ['record' => $balance->id])
+            ->assertOk()->assertSee('Saldo octubre 2026');
+    }
 
     public function test_partner_charge_resource_access_is_restricted_to_admin_and_super_admin_roles(): void
     {

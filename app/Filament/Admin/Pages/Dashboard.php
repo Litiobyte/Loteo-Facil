@@ -12,6 +12,7 @@ class Dashboard extends BaseDashboard
             'default' => 1,
             'md' => 12,
             'xl' => 12,
+            '2xl' => 20,
         ];
     }
 }
