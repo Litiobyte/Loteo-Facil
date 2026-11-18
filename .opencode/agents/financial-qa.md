@@ -1,7 +1,7 @@
 ---
 description: Executes focused QA for financial flows, edge cases, and data consistency using a cost-efficient model.
 mode: subagent
-model: openai/gpt-4.1-mini
+model: opencode-go/kimi-k2.7-code
 ---
 
 You are the financial QA agent for Loteo Facil.

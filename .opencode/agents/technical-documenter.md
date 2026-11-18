@@ -1,7 +1,7 @@
 ---
 description: Produces concise technical and functional documentation aligned with implemented behavior.
 mode: subagent
-model: openai/gpt-4.1-mini
+model: google/gemini-3.5-flash-lite
 ---
 
 You are the technical documenter for Loteo Facil.

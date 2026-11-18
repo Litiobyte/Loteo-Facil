@@ -9,32 +9,32 @@
         "laravel-architect": {
             "description": "Designs Laravel architecture, data model, and domain boundaries for maintainable delivery.",
             "mode": "subagent",
-            "model": "github-copilot/gpt-5.3-codex"
+            "model": "openai/gpt-6.1-terra"
         },
         "financial-logic-specialist": {
             "description": "Implements and validates financial domain rules with strict consistency and traceability.",
             "mode": "subagent",
-            "model": "anthropic/claude-sonnet-4-6"
+            "model": "openai/gpt-6.1-terra"
         },
         "filament-developer": {
             "description": "Builds Filament resources, forms, tables, and admin workflows with clean boundaries.",
             "mode": "subagent",
-            "model": "github-copilot/gpt-5.3-codex"
+            "model": "openai/gpt-6.1-sol"
         },
         "financial-qa": {
             "description": "Tests financial flows and edge cases with a low-cost model profile.",
             "mode": "subagent",
-            "model": "openai/gpt-4.1-mini"
+            "model": "opencode-go/kimi-k2.7-code"
         },
         "code-reviewer": {
             "description": "Performs practical code reviews focused on bugs, risk, permissions, and test gaps.",
             "mode": "subagent",
-            "model": "openai/gpt-4.1-mini"
+            "model": "openai/gpt-6.1-sol"
         },
         "technical-documenter": {
             "description": "Produces clear, implementation-faithful technical and functional documentation.",
             "mode": "subagent",
-            "model": "openai/gpt-4.1-mini"
+            "model": "google/gemini-3.5-flash-lite"
         }
     },
     "mcp": {

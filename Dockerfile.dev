@@ -1,0 +1,7 @@
+# Imagen de desarrollo local (PHP 8.3 + Composer + extensiones requeridas)
+FROM php:8.3-cli
+
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions intl bcmath pdo_sqlite zip gd
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
