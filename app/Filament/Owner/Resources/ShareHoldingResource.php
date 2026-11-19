@@ -3,13 +3,16 @@
 namespace App\Filament\Owner\Resources;
 
 use App\Filament\Owner\Resources\ShareHoldingResource\Pages\ListMyShares;
-use App\Models\CommunitySetting;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 class ShareHoldingResource extends \App\Filament\Admin\Resources\ShareHoldingResource
 {
-    protected static ?string $navigationLabel = 'Mis acciones';
+    protected static ?string $navigationLabel = 'Mi participación';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $pluralModelLabel = 'Mi participación';
 
     public static function canAccess(): bool
     {
@@ -18,7 +21,7 @@ class ShareHoldingResource extends \App\Filament\Admin\Resources\ShareHoldingRes
 
     public static function shouldRegisterNavigation(): bool
     {
-        return static::canAccess() && CommunitySetting::current()->usesShares();
+        return static::canAccess();
     }
 
     public static function getEloquentQuery(): Builder

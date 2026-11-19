@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Owner;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Filament\Owner\Pages\Dashboard;
+use App\Filament\Owner\Resources\Cobros\MisCobrosResource;
+use App\Filament\Owner\Resources\Users\Pages\ManageUsers;
+use App\Filament\Owner\Resources\Users\UserResource;
 use App\Models\Collection;
 use App\Models\CommunitySetting;
 use App\Models\Lote;
@@ -13,6 +15,7 @@ use App\Models\Propietario;
 use App\Models\ShareHolding;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -52,6 +55,38 @@ class DashboardTest extends TestCase
             ->assertSee('Estimación próximo pago')
             ->assertDontSee('Cobro privado ajeno')
             ->assertDontSee('Asamblea de propietarios');
+    }
+
+    public function test_owner_navigation_labels_order_and_profile_scope(): void
+    {
+        [$user] = $this->createOwner();
+        $otherUser = User::factory()->create();
+        CommunitySetting::query()->whereKey(1)->update(['mode' => 'mixed']);
+        $this->actingAs($user);
+
+        $groups = collect(Filament::getNavigation());
+        $items = $groups->flatMap(fn ($group) => $group->getItems());
+        $labels = $items
+            ->map(fn ($item) => $item->getLabel())
+            ->values()->all();
+
+        $this->assertSame([
+            'Mi comunidad', 'Mi participación', 'Mis cobros', 'Mis pagos',
+            'Estado de cuenta', 'Mi perfil', 'Mis lotes', 'Mapa del Loteo',
+        ], $labels);
+        foreach ($groups as $group) {
+            $this->assertNull($group->getIcon());
+        }
+        foreach ($items as $item) {
+            $this->assertNotNull($item->getIcon(), $item->getLabel());
+        }
+        $this->assertContains(UserResource::class, Filament::getPanel('owner')->getResources());
+        $this->get(UserResource::getUrl())->assertOk();
+        $this->assertSame([$user->id], UserResource::getEloquentQuery()->pluck('id')->all());
+        Livewire::test(ManageUsers::class)
+            ->assertSee('Datos personales')
+            ->assertSee($user->email)
+            ->assertDontSee($otherUser->email);
     }
 
     #[DataProvider('participationModes')]
@@ -169,6 +204,43 @@ class DashboardTest extends TestCase
             ->assertViewHas('pendingCharges', fn ($rows): bool => $rows->first()->description === 'Pendiente con fecha')
             ->assertSee('Vencido')
             ->assertSee('Sin fecha de vencimiento');
+    }
+
+    public function test_navigation_badge_counts_only_own_pending_and_partial_charges_with_balance(): void
+    {
+        [$user, $owner] = $this->createOwner();
+        PartnerCharge::factory()->create(['propietario_id' => $owner->id]);
+        PartnerCharge::factory()->create([
+            'propietario_id' => $owner->id, 'status' => ChargeStatus::Partial,
+            'amount' => 1000, 'paid_amount' => 500,
+        ]);
+        foreach ([ChargeStatus::Paid, ChargeStatus::Cancelled, ChargeStatus::Consolidated] as $status) {
+            PartnerCharge::factory()->create(['propietario_id' => $owner->id, 'status' => $status]);
+        }
+        PartnerCharge::factory()->create([
+            'propietario_id' => $owner->id, 'amount' => 1000, 'paid_amount' => 1000,
+        ]);
+        PartnerCharge::factory()->create();
+        $this->actingAs($user);
+
+        $this->assertSame('2', MisCobrosResource::getNavigationBadge());
+        $this->assertSame('danger', MisCobrosResource::getNavigationBadgeColor());
+        $item = collect(Filament::getNavigation())->flatMap(fn ($group) => $group->getItems())
+            ->first(fn ($item): bool => $item->getLabel() === 'Mis cobros');
+        $this->assertSame('2', $item->getBadge());
+        $this->assertSame('danger', $item->getBadgeColor());
+        Livewire::test(Dashboard::class)->assertViewHas('pendingCount', 2);
+    }
+
+    public function test_navigation_badge_is_hidden_without_pending_charges_or_owner_profile(): void
+    {
+        [$user] = $this->createOwner();
+        PartnerCharge::factory()->create();
+        $this->actingAs($user);
+        $this->assertNull(MisCobrosResource::getNavigationBadge());
+
+        $this->actingAs(User::factory()->create());
+        $this->assertNull(MisCobrosResource::getNavigationBadge());
     }
 
     public function test_owner_without_profile_gets_clear_empty_state(): void

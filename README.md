@@ -138,11 +138,78 @@ Base inicial del proyecto Laravel para el MVP de Loteo Facil.
 - Panel propietario: `http://127.0.0.1:8000/propietario`
 - Endpoint de salud: `http://127.0.0.1:8000/health`
 
-Usuarios iniciales (seeder):
+Usuarios de demostración (solo desarrollo; no usar estos seeders en producción):
 
 - Super Admin: `superadmin@loteofacil.cl` / `password`
 - Admin: `admin@loteofacil.cl` / `password`
 - Propietario (acceso solo a panel propietario): `propietario@loteofacil.cl` / `password`
+
+## Producción en Coolify
+
+El `Dockerfile` compila los assets e instala dependencias, pero **no ejecuta migraciones
+ni seeders**. Un push a `main` actualiza el código; no es una instalación de datos.
+Los siguientes comandos se ejecutan dentro del contenedor de la aplicación, en
+`/var/www`, nunca durante el build de la imagen.
+
+### Preparación (ambos casos)
+
+- Usar una base MySQL persistente, externa al contenedor de la aplicación, con sus
+  credenciales `DB_*` configuradas en Coolify. No crear una base nueva en cada deploy.
+- Configurar `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` con el dominio HTTPS
+  y `APP_KEY`. Para una instalación nueva generar una clave con
+  `php artisan key:generate --show` y guardarla como secreto en Coolify.
+  **En una instalación activa conservar exactamente la clave actual**.
+- Persistir `/var/www/storage/app` mediante Persistent Storage para documentos,
+  comprobantes y logos. Si ya existen archivos, respaldarlos y copiarlos al volumen
+  antes de montarlo: un volumen vacío puede ocultar los archivos existentes.
+- Respaldar base de datos y archivos antes de actualizar; verificar que el respaldo
+  se pueda restaurar. El volumen persistente no sustituye un respaldo.
+
+### Caso 1: instalación nueva, sin datos de demostración
+
+Desde la terminal interactiva del contenedor de Coolify:
+
+```bash
+cd /var/www
+php artisan migrate --force
+php artisan db:seed --class=RegionSeeder --force
+php artisan app:create-super-admin
+php artisan storage:link
+php artisan optimize
+```
+
+El comando solicita nombre, correo y contraseña oculta con confirmación (mínimo
+12 caracteres, mayúsculas, minúsculas y números). Crea los tres roles base y
+asigna `super_admin` al usuario nuevo. Rechaza correos ya registrados y no modifica
+cuentas existentes. No acepta `--no-interaction` ni contraseña como argumento.
+Ingresar en `/admin` y configurar la comunidad y los datos reales.
+
+**No ejecutar `DatabaseSeeder` ni `CleanInstallSeeder` en producción**: crean
+usuarios con contraseña de prueba; el primero además carga datos de demostración.
+
+### Caso 2: actualización de una instalación activa
+
+Mantener la misma base de datos, volúmenes y `APP_KEY`. Revisar las migraciones
+pendientes con `php artisan migrate:status` y probarlas antes en una copia de la
+base productiva. `migrate` aplica solo migraciones pendientes; no recrea la base,
+pero cada migración puede transformar datos y debe revisarse.
+
+Configurar en Coolify un comando post-despliegue que se ejecute sobre el
+**contenedor nuevo** (o ejecutar manualmente tras desplegar):
+
+```bash
+cd /var/www && php artisan migrate --force && php artisan storage:link && php artisan optimize
+```
+
+No ejecutar seeders, creación de superadmin ni generación de clave en este hook.
+No usar `migrate:fresh`, `migrate:refresh`, `db:wipe` ni importar una base local.
+Para cambios incompatibles con el código anterior, programar una ventana de
+mantenimiento; un hook posterior no garantiza despliegue sin interrupciones.
+
+Comprobar el resultado del hook y `migrate:status`, `/health`, los dos logins,
+datos históricos y archivos subidos. Si el hook falla, no asumir que la versión
+quedó operativa. Volver al código anterior no revierte las migraciones: analizar
+la compatibilidad y restaurar un respaldo solo como recuperación controlada.
 
 ## Roles base
 

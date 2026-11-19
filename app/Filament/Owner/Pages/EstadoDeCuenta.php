@@ -10,6 +10,7 @@ use App\Models\PartnerCharge;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -25,9 +26,9 @@ class EstadoDeCuenta extends Page implements HasTable
 
     protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
 
-    protected static ?string $navigationLabel = 'Estado de Cuenta';
+    protected static ?string $navigationLabel = 'Estado de cuenta';
 
-    protected static string|BackedEnum|null $navigationIcon = null;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
 
     protected static ?int $navigationSort = 30;
 
@@ -51,6 +52,11 @@ class EstadoDeCuenta extends Page implements HasTable
     public function getHeading(): string
     {
         return 'Estado de cuenta · '.CommunitySetting::displayName();
+    }
+
+    public function getMaxContentWidth(): Width|string|null
+    {
+        return Width::Full;
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -134,7 +140,9 @@ class EstadoDeCuenta extends Page implements HasTable
             'balance' => (float) $summary['net_balance'],
         ];
 
-        $debtByCategory = $statement['charges']
+        $currentCharges = app(PartnerStatementService::class)->getChargesDetail($propietario);
+
+        $debtByCategory = $currentCharges
             ->filter(fn ($charge): bool => in_array($charge->status->value, ['pending', 'partial'], true) && (float) $charge->remaining_amount > 0)
             ->groupBy(fn ($charge): string => $charge->expense?->category?->name ?? 'Sin categoría')
             ->map(fn ($items): float => round((float) $items->sum('remaining_amount'), 2))
@@ -149,8 +157,8 @@ class EstadoDeCuenta extends Page implements HasTable
             ->values()
             ->all();
 
-        $pendingCharges = $statement['charges']
-            ->filter(fn ($charge): bool => in_array($charge->status->value, ['pending', 'partial'], true))
+        $pendingCharges = $currentCharges
+            ->filter(fn ($charge): bool => in_array($charge->status->value, ['pending', 'partial'], true) && (float) $charge->remaining_amount > 0)
             ->sortBy('due_date')
             ->values();
 
@@ -162,6 +170,7 @@ class EstadoDeCuenta extends Page implements HasTable
             'desglose' => $desglose,
             'timeline' => $statement['timeline']->take(20),
             'monthComparison' => $this->monthComparison,
+            'periodPaid' => (float) $statement['collections']->where('status.value', '!=', 'cancelled')->sum('amount'),
         ];
     }
 
@@ -173,18 +182,9 @@ class EstadoDeCuenta extends Page implements HasTable
 
                 $query = PartnerCharge::query()
                     ->where('propietario_id', $propietarioId)
+                    ->whereIn('status', [ChargeStatus::Pending, ChargeStatus::Partial])
                     ->where('remaining_amount', '>', 0)
                     ->orderBy('due_date');
-
-                $query
-                    ->when(
-                        $this->desde,
-                        fn (Builder $query): Builder => $query->whereDate('due_date', '>=', Carbon::parse($this->desde)->toDateString())
-                    )
-                    ->when(
-                        $this->hasta,
-                        fn (Builder $query): Builder => $query->whereDate('due_date', '<=', Carbon::parse($this->hasta)->toDateString())
-                    );
 
                 return $query;
             })
@@ -195,7 +195,11 @@ class EstadoDeCuenta extends Page implements HasTable
                     ->sortable()
                     ->formatStateUsing(fn (?string $state): string => $state ?: 'Cobro sin descripción'),
                 TextColumn::make('amount')
-                    ->label('Monto')
+                    ->label('Monto original')
+                    ->money('CLP', locale: 'es_CL')
+                    ->sortable(),
+                TextColumn::make('remaining_amount')
+                    ->label('Por pagar')
                     ->money('CLP', locale: 'es_CL')
                     ->sortable(),
                 TextColumn::make('due_date')
@@ -237,8 +241,8 @@ class EstadoDeCuenta extends Page implements HasTable
             ->defaultSort('due_date', 'asc')
             ->paginationPageOptions([10])
             ->defaultPaginationPageOption(10)
-            ->emptyStateHeading('No hay cobros en este período')
-            ->emptyStateDescription('Prueba ajustando las fechas para ver otros cobros pendientes.');
+            ->emptyStateHeading('No hay cobros pendientes')
+            ->emptyStateDescription('No tienes obligaciones con saldo por pagar.');
     }
 
     /**

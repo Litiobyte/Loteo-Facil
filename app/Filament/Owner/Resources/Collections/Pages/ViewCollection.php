@@ -15,6 +15,15 @@ class ViewCollection extends ViewRecord
 {
     protected static string $resource = MyCollectionsResource::class;
 
+    protected string $view = 'filament.owner.pages.mis-pagos-view';
+
+    protected function getViewData(): array
+    {
+        return [
+            'payment' => $this->getRecord()->loadMissing('allocations.charge'),
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [];
@@ -24,7 +33,7 @@ class ViewCollection extends ViewRecord
     {
         return $schema
             ->components([
-                Section::make('Información del Recaudacion')
+                Section::make('Información del pago')
                     ->columns(2)
                     ->schema([
                         TextEntry::make('id')->label('ID')->formatStateUsing(fn (mixed $state): string => '#'.str_pad((string) $state, 3, '0', STR_PAD_LEFT)),

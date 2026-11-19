@@ -27,6 +27,11 @@ class PropietarioPolicy
         return $user->hasAnyRole(['super_admin', 'admin']);
     }
 
+    public function updateProfile(User $user, Propietario $propietario): bool
+    {
+        return $user->hasRole('propietario') && $propietario->user_id === $user->id;
+    }
+
     public function delete(User $user, Propietario $propietario): bool
     {
         return $user->hasAnyRole(['super_admin', 'admin']);

@@ -17,13 +17,13 @@ class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static string|BackedEnum|null $navigationIcon = null;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-user';
 
     protected static ?string $navigationLabel = 'Mi perfil';
 
     protected static string|UnitEnum|null $navigationGroup = 'Mis Datos';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 0;
 
     protected static ?string $modelLabel = 'Perfil';
 

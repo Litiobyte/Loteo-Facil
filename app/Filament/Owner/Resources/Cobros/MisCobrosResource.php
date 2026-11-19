@@ -27,17 +27,32 @@ class MisCobrosResource extends Resource
 {
     protected static ?string $model = PartnerCharge::class;
 
-    protected static string|BackedEnum|null $navigationIcon = null;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
 
     protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
 
-    protected static ?string $navigationLabel = 'Mis Cobros';
+    protected static ?string $navigationLabel = 'Mis cobros';
 
     protected static ?int $navigationSort = 10;
 
     protected static ?string $modelLabel = 'Cobro';
 
     protected static ?string $pluralModelLabel = 'Mis Cobros';
+
+    public static function getNavigationBadge(): ?string
+    {
+        $count = static::getEloquentQuery()
+            ->unpaid()
+            ->where('remaining_amount', '>', 0)
+            ->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): string
+    {
+        return 'danger';
+    }
 
     public static function form(Schema $schema): Schema
     {

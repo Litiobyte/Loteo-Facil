@@ -8,7 +8,7 @@ use App\Filament\Owner\Resources\Collections\Pages\ListMyCollections;
 use App\Filament\Owner\Resources\Collections\Pages\ViewCollection;
 use App\Models\Collection;
 use BackedEnum;
-use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -26,17 +26,17 @@ class MyCollectionsResource extends Resource
 {
     protected static ?string $model = Collection::class;
 
-    protected static string|BackedEnum|null $navigationIcon = null;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
 
     protected static string|UnitEnum|null $navigationGroup = 'Finanzas';
 
-    protected static ?string $navigationLabel = 'Mis Recaudaciones';
+    protected static ?string $navigationLabel = 'Mis pagos';
 
     protected static ?int $navigationSort = 20;
 
-    protected static ?string $modelLabel = 'Recaudacion';
+    protected static ?string $modelLabel = 'Pago';
 
-    protected static ?string $pluralModelLabel = 'Mis Recaudaciones';
+    protected static ?string $pluralModelLabel = 'Mis pagos';
 
     public static function form(Schema $schema): Schema
     {
@@ -66,6 +66,7 @@ class MyCollectionsResource extends Resource
                     ->label('Método')
                     ->badge()
                     ->formatStateUsing(fn (CollectionMethod|string $state): string => static::paymentMethodLabel($state))
+                    ->searchable()
                     ->sortable(),
                 TextColumn::make('amount')
                     ->label('Monto')
@@ -98,6 +99,7 @@ class MyCollectionsResource extends Resource
                     ->color(fn (CollectionStatus|string $state): string => static::statusColor($state)),
                 TextColumn::make('reference')
                     ->label('Referencia')
+                    ->searchable()
                     ->toggleable(),
                 TextColumn::make('notes')
                     ->label('Notas')
@@ -144,7 +146,15 @@ class MyCollectionsResource extends Resource
                     ->query(fn (Builder $query): Builder => $query->whereYear('collection_date', now()->year)),
             ])
             ->recordActions([
-                ViewAction::make(),
+                Action::make('detail')
+                    ->label('Ver detalle')
+                    ->authorize(fn (Collection $record): bool => static::canView($record))
+                    ->modalHeading('Detalle del pago')
+                    ->modalContent(fn (Collection $record) => view('filament.owner.pages.partials.mis-pagos-detail', [
+                        'payment' => $record->loadMissing('allocations.charge'),
+                    ]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Cerrar'),
             ])
             ->emptyStateHeading('Sin pagos registrados')
             ->emptyStateDescription('Cuando registremos pagos asociados a tus cobros, aparecerán aquí.');
