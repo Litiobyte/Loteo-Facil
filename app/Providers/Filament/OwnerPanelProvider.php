@@ -62,10 +62,8 @@ class OwnerPanelProvider extends PanelProvider
                 Dashboard::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make('Finanzas')
-                    ->icon('heroicon-o-currency-dollar'),
-                NavigationGroup::make('Mis Datos')
-                    ->icon('heroicon-o-user'),
+                NavigationGroup::make('Finanzas'),
+                NavigationGroup::make('Mis Datos'),
             ])
             ->middleware([
                 EncryptCookies::class,

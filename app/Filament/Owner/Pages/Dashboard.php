@@ -11,6 +11,8 @@ use Livewire\Attributes\Locked;
 
 class Dashboard extends \Filament\Pages\Dashboard
 {
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-home';
+
     protected static ?string $navigationLabel = 'Mi comunidad';
 
     protected static ?string $title = 'Mi comunidad';

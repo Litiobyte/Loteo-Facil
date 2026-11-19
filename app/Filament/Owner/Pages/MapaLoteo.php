@@ -23,7 +23,7 @@ class MapaLoteo extends Page
 
     protected static ?string $navigationLabel = 'Mapa del Loteo';
 
-    protected static string|BackedEnum|null $navigationIcon = null;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-map';
 
     protected static ?int $navigationSort = 40;
 
