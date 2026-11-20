@@ -53,6 +53,7 @@ class Expense extends Model
     /** @var list<string> */
     protected $fillable = [
         'expense_category_id',
+        'supplier_id',
         'title',
         'description',
         'amount',
@@ -97,6 +98,7 @@ class Expense extends Model
         static::saving(function (self $expense): void {
             $validator = Validator::make($expense->attributesToArray(), [
                 'expense_category_id' => ['required', 'exists:expense_categories,id'],
+                'supplier_id' => ['nullable', 'exists:suppliers,id'],
                 'title' => ['required', 'string', 'max:200'],
                 'description' => ['nullable', 'string', 'max:500'],
                 'amount' => ['required', 'numeric', 'gt:0'],
@@ -195,6 +197,11 @@ class Expense extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ExpenseCategory::class, 'expense_category_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 
     public function creator(): BelongsTo

@@ -97,6 +97,13 @@ class ExpenseResource extends Resource
                                     ->default(true)
                                     ->required(),
                             ]),
+                        Select::make('supplier_id')
+                            ->label('Proveedor')
+                            ->relationship('supplier', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->createOptionForm(SupplierResource::fields(ignoreRecord: false)),
                         ChileanNumberInput::make('amount')
                             ->label('Monto')
                             ->required()
@@ -175,7 +182,7 @@ class ExpenseResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('category')->withCount(['charges', 'children']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['category', 'supplier'])->withCount(['charges', 'children']))
             ->defaultSort('expense_date', 'desc')
             ->columns(AdminTableColumns::contentSized([
                 TextColumn::make('is_recurring')
@@ -191,6 +198,12 @@ class ExpenseResource extends Resource
                     ->label('Categoría')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('supplier.name')
+                    ->label('Proveedor')
+                    ->placeholder('Sin proveedor')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('amount')
                     ->label('Monto')
                     ->money('CLP', locale: 'es_CL')
@@ -737,6 +750,7 @@ class ExpenseResource extends Resource
     {
         return Expense::query()->create([
             'expense_category_id' => $record->expense_category_id,
+            'supplier_id' => $record->supplier_id,
             'title' => $record->title,
             'description' => $record->description,
             'amount' => (float) $data['amount'],
