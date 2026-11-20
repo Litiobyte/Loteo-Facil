@@ -104,7 +104,7 @@ class ManageUsers extends Page
     {
         abort_unless(Auth::user()?->hasRole('propietario'), 403);
 
-        return Propietario::query()->where('user_id', Auth::id())->first();
+        return Auth::user()->propietario;
     }
 
     protected function getViewData(): array

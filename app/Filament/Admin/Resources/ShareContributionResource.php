@@ -26,6 +26,8 @@ class ShareContributionResource extends Resource
 
     protected static ?string $modelLabel = 'Aporte por acciones';
 
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-trending-up';
+
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAnyRole(['admin', 'super_admin']) ?? false;

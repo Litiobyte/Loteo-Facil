@@ -15,21 +15,27 @@ class PropietarioRegistrationService
             throw new DomainException('El usuario debe tener rol propietario para registrarse como propietario.');
         }
 
-        return DB::transaction(fn (): Propietario => Propietario::firstOrCreate(
-            ['user_id' => $user->id],
-            [
-                'nombre' => $user->name,
-                'apellido' => 'Sin apellido',
-                'rut' => sprintf('%08d-%d', $user->id, 0),
-                'email' => $user->email,
-                'telefono' => null,
-                'direccion' => null,
-                'region_id' => null,
-                'comuna_id' => null,
-                'nacionalidad' => null,
-                'profesion' => null,
-                'estado_civil' => null,
-            ]
-        ));
+        return DB::transaction(function () use ($user): Propietario {
+            if ($user->secondary_propietario_id !== null) {
+                throw new DomainException('Un usuario secundario no puede ser propietario principal.');
+            }
+
+            return Propietario::firstOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'nombre' => $user->name,
+                    'apellido' => 'Sin apellido',
+                    'rut' => sprintf('%08d-%d', $user->id, 0),
+                    'email' => $user->email,
+                    'telefono' => null,
+                    'direccion' => null,
+                    'region_id' => null,
+                    'comuna_id' => null,
+                    'nacionalidad' => null,
+                    'profesion' => null,
+                    'estado_civil' => null,
+                ]
+            );
+        });
     }
 }

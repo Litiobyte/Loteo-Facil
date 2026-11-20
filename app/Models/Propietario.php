@@ -54,6 +54,11 @@ class Propietario extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function secondaryUsers(): HasMany
+    {
+        return $this->hasMany(User::class, 'secondary_propietario_id');
+    }
+
     public function lotes(): BelongsToMany
     {
         return $this->belongsToMany(Lote::class, 'lote_propietario')

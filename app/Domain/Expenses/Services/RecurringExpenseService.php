@@ -34,7 +34,7 @@ class RecurringExpenseService
 
                 $head = new Expense;
                 $head->fill(collect($data)->only([
-                    'expense_category_id', 'title', 'description', 'amount', 'expense_date',
+                    'expense_category_id', 'supplier_id', 'title', 'description', 'amount', 'expense_date',
                     'due_date', 'distribution_type', 'created_by', 'notes', 'recurrence_end_date',
                 ])->all());
                 $head->is_recurring = true;
@@ -62,6 +62,7 @@ class RecurringExpenseService
 
                 Expense::query()->create([
                     'expense_category_id' => $head->expense_category_id,
+                    'supplier_id' => $head->supplier_id,
                     'title' => $head->title,
                     'description' => $head->description,
                     'amount' => $head->amount,

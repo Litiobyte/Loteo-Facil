@@ -21,6 +21,7 @@
                     </section>
 
                     <form wire:submit="saveProfile" class="op-stack">
+                        <fieldset class="op-stack" @disabled(! auth()->user()->can('updateProfile', $owner))>
                         @foreach (['Datos personales' => ['nombre', 'apellido', 'rut', 'profesion', 'nacionalidad'], 'Información de contacto' => ['email', 'telefono', 'direccion', 'region_id', 'comuna_id']] as $section => $sectionFields)
                             <section class="op-card">
                                 <div class="op-card-head">
@@ -54,6 +55,8 @@
                                 </div>
                             </section>
                         @endforeach
+                        </fieldset>
+                        @can('updateProfile', $owner)
                         <div class="op-card op-actions">
                             <span role="status">
                                 @if ($saved) Tus cambios se guardaron correctamente.
@@ -62,6 +65,9 @@
                             </span>
                             <x-filament::button type="submit" icon="heroicon-o-check" wire:loading.attr="disabled" wire:target="saveProfile">Guardar cambios</x-filament::button>
                         </div>
+                        @else
+                            <p>Tu cuenta tiene acceso de solo lectura a este perfil.</p>
+                        @endcan
                     </form>
                 </div>
 
