@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Users;
 
 use App\Domain\Users\Services\UserRoleAssignmentService;
 use App\Filament\Resources\Users\Pages\ManageUsers;
+use App\Models\Propietario;
 use App\Models\User;
 use App\Support\AdminTableColumns;
 use BackedEnum;
@@ -65,6 +66,14 @@ class UserResource extends Resource
                     ->options(fn (): array => $roleService->roleOptionsFor(Auth::user()))
                     ->searchable()
                     ->preload(),
+                Select::make('secondary_propietario_id')
+                    ->label('Propietario asociado (acceso de solo lectura)')
+                    ->helperText('Selecciona un propietario para dar acceso secundario de solo lectura con rol propietario. Deja vacío para no asociar o desvincular. Las cuentas principales no pueden ser secundarias.')
+                    ->options(fn (): array => Propietario::query()->orderBy('nombre')->get()
+                        ->mapWithKeys(fn (Propietario $owner): array => [$owner->id => $owner->nombre_completo.' ('.$owner->rut.')'])->all())
+                    ->searchable()
+                    ->preload()
+                    ->visible(fn (?User $record): bool => $record === null || ! $record->propietario()->exists()),
             ]);
     }
 
@@ -80,6 +89,11 @@ class UserResource extends Resource
                     ->label('Email')
                     ->sortable()
                     ->searchable(),
+                TextColumn::make('owner_access')
+                    ->label('Acceso propietario')
+                    ->state(fn (User $record): string => $record->propietario
+                        ? $record->propietario->nombre_completo.($record->secondary_propietario_id ? ' (solo lectura)' : ' (principal)')
+                        : 'Sin asociar'),
                 TextColumn::make('roles.name')
                     ->label('Rol')
                     ->sortable(query: function (Builder $query, string $direction): Builder {
@@ -117,6 +131,13 @@ class UserResource extends Resource
                         }
 
                         DB::transaction(function () use ($data, $record, $actor, $roleService, $role): void {
+                            $secondaryOwnerId = $data['secondary_propietario_id'] ?? null;
+                            if (filled($secondaryOwnerId)) {
+                                if ($role !== 'propietario' || $record->propietario()->exists() || ! Propietario::query()->whereKey($secondaryOwnerId)->exists()) {
+                                    throw ValidationException::withMessages(['secondary_propietario_id' => 'Selecciona un propietario válido para un usuario sin cuenta principal y con rol propietario.']);
+                                }
+                            }
+
                             $record->update([
                                 'name' => $data['name'],
                                 'email' => $data['email'],
@@ -127,6 +148,7 @@ class UserResource extends Resource
                             }
 
                             $roleService->assignRole($actor, $record, $role);
+                            $record->forceFill(['secondary_propietario_id' => $secondaryOwnerId ?: null])->save();
                         });
                     }),
                 DeleteAction::make(),
@@ -140,7 +162,7 @@ class UserResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->with('roles');
+        $query = parent::getEloquentQuery()->with(['roles', 'propietario', 'secondaryPropietario']);
 
         $user = Auth::user();
 

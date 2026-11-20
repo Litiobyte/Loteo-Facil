@@ -11,6 +11,7 @@ class PropietarioEligibleUserService
     {
         return $query
             ->whereHas('roles', fn (Builder $roles): Builder => $roles->where('name', 'propietario'))
+            ->whereNull('secondary_propietario_id')
             ->whereDoesntHave('propietario');
     }
 
@@ -18,6 +19,7 @@ class PropietarioEligibleUserService
     {
         return $query
             ->whereHas('roles', fn (Builder $roles): Builder => $roles->where('name', 'propietario'))
+            ->whereNull('secondary_propietario_id')
             ->where(function (Builder $users) use ($record): void {
                 $users->whereDoesntHave('propietario');
 

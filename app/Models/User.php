@@ -9,6 +9,7 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -29,6 +30,16 @@ class User extends Authenticatable implements FilamentUser
     public function propietario(): HasOne
     {
         return $this->hasOne(Propietario::class);
+    }
+
+    public function secondaryPropietario(): BelongsTo
+    {
+        return $this->belongsTo(Propietario::class, 'secondary_propietario_id');
+    }
+
+    public function getPropietarioAttribute(): ?Propietario
+    {
+        return $this->getRelationValue('propietario') ?? $this->secondaryPropietario;
     }
 
     public function canAccessPanel(Panel $panel): bool

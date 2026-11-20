@@ -6,6 +6,7 @@ use App\Domain\Owners\Services\PropietarioEligibleUserService;
 use App\Filament\Resources\Propietarios\Pages\CreatePropietario;
 use App\Filament\Resources\Propietarios\Pages\EditPropietario;
 use App\Filament\Resources\Propietarios\Pages\ListPropietarios;
+use App\Filament\Resources\Propietarios\RelationManagers\AssociatedUsersRelationManager;
 use App\Filament\Resources\Propietarios\RelationManagers\LotesRelationManager;
 use App\Filament\Resources\Propietarios\RelationManagers\ShareContributionsRelationManager;
 use App\Filament\Resources\Propietarios\RelationManagers\ShareHoldingsRelationManager;
@@ -235,6 +236,7 @@ class PropietarioResource extends Resource
             LotesRelationManager::class,
             ShareHoldingsRelationManager::class,
             ShareContributionsRelationManager::class,
+            AssociatedUsersRelationManager::class,
         ];
     }
 
