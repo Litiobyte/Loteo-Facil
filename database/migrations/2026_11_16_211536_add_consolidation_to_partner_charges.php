@@ -37,11 +37,15 @@ return new class extends Migration
         }
         Schema::create('partner_charge_consolidation_links', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('consolidated_charge_id')->constrained('partner_charges')->restrictOnDelete();
-            $table->foreignId('source_charge_id')->constrained('partner_charges')->restrictOnDelete();
+            $table->foreignId('consolidated_charge_id');
+            $table->foreignId('source_charge_id');
             $table->decimal('transferred_amount', 15, 2);
             $table->unique(['consolidated_charge_id', 'source_charge_id'], 'charge_consolidation_link_unique');
             $table->unique('source_charge_id');
+            $table->foreign('consolidated_charge_id', 'charge_link_consolidated_fk')
+                ->references('id')->on('partner_charges')->restrictOnDelete();
+            $table->foreign('source_charge_id', 'charge_link_source_fk')
+                ->references('id')->on('partner_charges')->restrictOnDelete();
         });
     }
 
