@@ -8,13 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('maps', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('etapa_id')->unique()->constrained('etapas')->cascadeOnDelete();
-            $table->foreignId('published_import_id')->nullable()->constrained('map_imports')->nullOnDelete();
-            $table->timestamps();
-        });
-
         Schema::create('map_imports', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('etapa_id')->constrained('etapas')->cascadeOnDelete();
@@ -42,6 +35,13 @@ return new class extends Migration
             $table->unique(['etapa_id', 'slug']);
         });
 
+        Schema::create('maps', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('etapa_id')->unique()->constrained('etapas')->cascadeOnDelete();
+            $table->foreignId('published_import_id')->nullable()->constrained('map_imports')->nullOnDelete();
+            $table->timestamps();
+        });
+
         Schema::create('map_geometries', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('map_import_id')->constrained('map_imports')->cascadeOnDelete();
@@ -62,8 +62,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('map_geometries');
+        Schema::dropIfExists('maps');
         Schema::dropIfExists('map_layers');
         Schema::dropIfExists('map_imports');
-        Schema::dropIfExists('maps');
     }
 };

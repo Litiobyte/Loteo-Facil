@@ -16,7 +16,6 @@ class CleanInstallSeeder extends Seeder
     public function run(): void
     {
         Role::findOrCreate('super_admin', 'web');
-        Role::findOrCreate('admin', 'web');
         Role::findOrCreate('propietario', 'web');
 
         $this->call(RegionSeeder::class);
@@ -25,7 +24,6 @@ class CleanInstallSeeder extends Seeder
 
         foreach ([
             ['email' => 'superadmin@loteofacil.cl', 'name' => 'Super Admin Loteo Facil', 'role' => 'super_admin'],
-            ['email' => 'admin@loteofacil.cl', 'name' => 'Admin Loteo Facil', 'role' => 'admin'],
         ] as $account) {
             $user = User::query()->firstOrCreate(
                 ['email' => $account['email']],
