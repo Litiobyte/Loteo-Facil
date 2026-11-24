@@ -39,6 +39,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Livewire's direct S3 upload signs an ACL header that R2 does not support.
+        config()->set('livewire.temporary_file_upload.disk', 'local');
+
         Relation::morphMap([
             Propietario::class => Propietario::class,
             ShareHolding::class => ShareHolding::class,

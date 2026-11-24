@@ -9,6 +9,7 @@ use Aws\S3\S3Client;
 use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
 use Mockery;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -16,6 +17,14 @@ use Tests\TestCase;
 class PrivateStorageTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_temporary_uploads_stay_local_when_default_disk_is_r2(): void
+    {
+        config()->set('filesystems.default', 'r2');
+
+        $this->assertSame('local', config('livewire.temporary_file_upload.disk'));
+        $this->assertFalse(FileUploadConfiguration::isUsingS3());
+    }
 
     public function test_private_storage_configuration_does_not_expose_public_urls_or_request_r2_acl(): void
     {
