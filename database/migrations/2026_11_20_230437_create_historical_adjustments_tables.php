@@ -33,8 +33,8 @@ return new class extends Migration
         });
         Schema::create('historical_adjustment_allocations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('historical_adjustment_id')->constrained()->restrictOnDelete();
-            $table->foreignId('partner_charge_id')->constrained()->restrictOnDelete();
+            $table->foreignId('historical_adjustment_id')->constrained(indexName: 'haa_adjustment_fk')->restrictOnDelete();
+            $table->foreignId('partner_charge_id')->constrained(indexName: 'haa_charge_fk')->restrictOnDelete();
             $table->decimal('amount', 15, 2);
             $table->date('effective_date');
             $table->foreignId('authorized_by')->constrained('users')->restrictOnDelete();
