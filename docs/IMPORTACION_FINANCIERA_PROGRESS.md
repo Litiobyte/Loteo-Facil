@@ -10,9 +10,9 @@ Módulo de importaciones financieras históricas para Loteo Fácil: incorporar g
 
 ## Estado general
 
-- Etapa actual: **Etapa 6 cerrada (dominio y UI Filament verificados en SQLite). Próxima: Etapa 7 — integración y QA final.**
+- Etapa actual: **Etapa 7 cerrada con hallazgos documentados — módulo financiero validado en SQLite y MySQL real (colación y concurrencia). Pendientes: decisión de esquema de `metros_cuadrados` (lotes) y `DocumentRelationsTest` (documentos), ajenos a este módulo.**
 - Última actualización: 2026-11-24
-- Próxima tarea: **Etapa 7: integración, revisión y QA final, especialmente MySQL, colación y concurrencia antes de producción.** El reporte de Etapa 6 lista ajustes anuales/desconocidos sin imputación mensual arbitraria; no habilita fechas desconocidas en los servicios de escritura.
+- Próxima tarea: resolver los hallazgos de MySQL fuera del módulo antes de despliegue (schema `metros_cuadrados`, `DocumentRelationsTest`, tests de documentos con `migrate:fresh` por test); el reporte de ajustes con precisión anual/desconocida no habilita fechas desconocidas en servicios de escritura.
 
 ## Arquitectura aprobada
 
@@ -205,13 +205,16 @@ Acciones con confirmación explícita: reconocimiento con monto, fecha completa,
 Cierre con limitaciones vigentes: fechas desconocidas no admitidas en escritura; listado anual/desconocido sin mes ficticio; resumen acumulado actual, no retrospectivo; MySQL/colación/concurrencia y QA integral antes de producción siguen en Etapa 7. No se modificó dominio, migraciones, documentos ni Owner desde este bloque UI.
 
 ### Etapa 7 — Integración y QA final
-- [ ] Permisos `super_admin` en UI y servicios; historial de importaciones.
-- [ ] Pruebas sobre períodos cerrados y concurrentes.
-- [ ] Validación de caja, estados de cuenta, importación combinada, MySQL.
-- [ ] Validación MySQL de colación y concurrencia con cierres y pagos; las suites ejecutadas hasta ahora usan SQLite en Docker.
-- [ ] Tests de regresión; actualización de `README.md`/`PROJECT_MAP.md`.
+- [x] Permisos `super_admin` en UI y servicios; historial de importaciones (verificado transversalmente en etapas 1-6 y en la suite MySQL).
+- [x] Pruebas sobre períodos cerrados (existentes por importador) y concurrentes (`MysqlConcurrencyQaTest`: carrera de procesos reales sobre el mismo pago, solo MySQL; serialización `FOR UPDATE` evita sobre-aplicación).
+- [x] Validación de caja, estados de cuenta e importación combinada (`FinancialCombinedImportTest`: apertura → gasto → cobro → recaudación → conciliación, idempotencia total de la cadena y bloqueo de período cerrado con estado intacto).
+- [x] Validación MySQL real: migraciones completas (tras corregir nombre de FK >64 en `historical_adjustment_allocations`), colación `utf8mb4_unicode_ci` (unicidad case-insensitive verificada), regresión financiera 173/1187 y suite completa 789/6068 con 2 fallos ajenos al módulo.
+- [x] Tests de regresión; actualización de `README.md` (sección del módulo de importaciones financieras). `PROJECT_MAP.md` no existe; no se crea sin solicitud.
+- [ ] Pendiente antes de producción (hallazgos de la pasada MySQL): `ChileanNumberInputTest`/`metros_cuadrados` es `unsignedBigInteger` y el test exige fracción — SQLite preserva la fracción y MySQL trunca; requiere decisión de esquema (módulo de lotes). `DocumentRelationsTest` (módulo de documentos, trabajo paralelo) falla solo sobre MySQL. Los tres tests de documentos que ejecutan `migrate:fresh` por test (`DocumentManagerTest`, `DocumentIntegrationTest`, `DocumentServiceTest`) confirman implícitamente la transacción de RefreshDatabase en MySQL y filtran datos a tests posteriores; los tests de reejecución de migraciones con DDL (`ShareAdministrationTest::test_migration_is_reversible_on_sqlite`, `ShareContributionTest::test_migration_preserves_existing_holdings...`) quedaron restringidos a SQLite.
 
 ## Pruebas
+
+- 2026-11-24, cierre Etapa 7 (sesión principal): QA MySQL real con infraestructura desechable (red + contenedores `loteo-qa-mysql` MySQL 8.0 y `loteo-qa-php` con `pdo_mysql`, repo montado; eliminados al cerrar). Migraciones completas sobre MySQL tras corregir el nombre de FK de `historical_adjustment_allocations` (identificador >64). Nuevos tests: `FinancialCombinedImportTest` (3) y `MysqlConcurrencyQaTest` (2, solo MySQL). Resultados MySQL: QA nuevos **5 aprobadas, 35 aserciones**; regresión financiera ampliada **173 aprobadas, 1187 aserciones**, 319,01 s; suite completa **789 aprobadas, 2 fallidas, 2 omitidas, 6068 aserciones**, 887,99 s. Fallos: `ChileanNumberInputTest::test_lot_surface_keeps_fraction...` (columna `unsignedBigInteger` trunca la fracción en MySQL; decisión de esquema pendiente en módulo de lotes) y `DocumentRelationsTest` (módulo de documentos, trabajo paralelo). Omitidos: los dos tests de reejecución de migración con DDL (restringidos a SQLite por el commit implícito de DDL en MySQL). Correcciones de tests para MySQL: FK de `historical_adjustments` con nombres explícitos; fixtures de `OwnerLocationResolverTest` sin IDs prefijados (autoincremento no se reinicia tras rollback); estado `ended` → `unassigned` en `MisLotesResourceTest` y `LoteMapFeatureTest` (el dominio no usa `ended`; el CHECK de MySQL lo rechazaba); aserción de rollback en `HistoricalExternalIdentityTest` robusta ante fugas entre tests; snapshot JSON comparado con `assertEqualsCanonicalizing` (MySQL reordena claves JSON). Verificación SQLite de los archivos tocados: **90 aprobadas, 2 omitidas, 407 aserciones** (los omitidos son los 2 tests MySQL-only). Pint `--dirty --format agent`: aprobado.
 
 - 2026-11-24, UI Etapa 6 en Docker `loteo-facil-serve`/SQLite, secuencial con `PHP_INI_SCAN_DIR=:/tmp/loteo-test-ini`: `HistoricalReconciliationUiTest` **9 aprobadas, 187 aserciones**, 29,63 s. Regresión `HistoricalReconciliationTest|FinancialImportUiTest|HistoricalFinancialServicesTest|FinancialImportServiceTest` **66 aprobadas, 597 aserciones**, 96,07 s. Pint `vendor/bin/pint --dirty --format agent`: **passed** desde `/app` (el comando inicial con `/var/www/html` falló por no encontrar `vendor/bin/pint`; `docker exec ... pwd` confirmó `/app`). Los intentos iniciales de UI tuvieron 6 aprobadas/3 fallidas (134 aserciones) y 7 aprobadas/2 fallidas (154 aserciones): se trasladó además la advertencia al contenido permanente y se configuró `Repeater::fake()` para que las claves UUID del formulario no agregaran un ítem vacío durante `setActionData`; no eran fallos de dominio. Fechas de fixtures explícitas mediante apertura histórica 2020-01-31 y operaciones 2021-02-01. No se ejecutó suite completa nueva en este bloque; las verificaciones anteriores se conservan abajo.
 
@@ -288,6 +291,8 @@ Cierre con limitaciones vigentes: fechas desconocidas no admitidas en escritura;
 
 ## Historial de sesiones
 
+- **2026-11-24** — Cierre Etapa 7 (sesión principal): QA MySQL real desechable (contenedores `loteo-qa-mysql`/`loteo-qa-php`, eliminados al final). Corregido nombre de FK en migración de ajustes; creados `FinancialCombinedImportTest` (cadena combinada) y `MysqlConcurrencyQaTest` (carrera de procesos y colación, solo MySQL); correcciones de tests para MySQL en `OwnerLocationResolverTest`, `MisLotesResourceTest`, `LoteMapFeatureTest`, `HistoricalExternalIdentityTest`, `ShareAdministrationTest` y `ShareContributionTest`. MySQL final: 789/6068 con 2 fallos ajenos al módulo (lotes y documentos); SQLite de archivos tocados 90/407; Pint aprobado. README actualizado. Hallazgos fuera de módulo documentados en Etapa 7.
+
 - **2026-11-24** — UI Etapa 6: creados `app/Filament/Admin/Pages/HistoricalReconciliation.php`, `resources/views/filament/admin/pages/historical-reconciliation.blade.php` y `tests/Feature/HistoricalReconciliationUiTest.php`; actualizado este progreso. Desglose delegado en `report()`, reconocimiento con caja/evidencia/autorizante, clasificación manual sin caja, errores de suma/exceso visibles y reintentos conservando formulario; acceso exclusivo y reautorización super_admin. Pint aprobado; UI **9/187** y regresión solicitada **66/597** verdes, secuencialmente. Etapa 6 cerrada con limitaciones existentes, próxima Etapa 7. Sin cambios de dominio, migraciones, documentos ni Owner; suite completa nueva pendiente de coordinación.
 
 - **2026-11-24** — Suite completa de consolidación Etapa 6 ejecutada en Docker/SQLite: 774 aprobadas (5839 aserciones) + repetición de `LandingPageTest` 2/21 tras interferencia de edición concurrente. Solo se actualizó este progreso; sin cambios de código. Próximo paso: UI Filament de conciliación (en curso con `filament-developer`).
@@ -326,4 +331,4 @@ Cierre con limitaciones vigentes: fechas desconocidas no admitidas en escritura;
 
 ## Próximo paso
 
-**Etapa 7 — Integración y QA final** (etapas 0-6 cerradas con las limitaciones indicadas): revisión transversal de permisos y servicios, períodos cerrados, importación combinada, caja/estados de cuenta y regresiones integrales. MySQL, colación y concurrencia son obligatorios antes de producción. Etapa 6 ya lista ajustes anuales/desconocidos sin atribuirles un mes, pero no habilita fechas desconocidas ni reconstrucción retrospectiva de saldos.
+**Módulo financiero completo (etapas 0-7).** Pendientes antes de despliegue, fuera del módulo: decidir esquema de `metros_cuadrados` (fracción vs. `unsignedBigInteger`, módulo de lotes); resolver `DocumentRelationsTest` sobre MySQL y los tres tests de documentos con `migrate:fresh` por test (módulo de documentos). Los servicios de escritura siguen sin soportar precisión `unknown`; los ajustes anuales/mensuales se listan sin imputación mensual arbitraria.

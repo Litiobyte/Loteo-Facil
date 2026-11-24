@@ -127,6 +127,18 @@ class ShareContributionService
         ];
     }
 
+    /** Ids de socios con acciones cuyo aporte histórico no está informado. @return array<int> */
+    public function ownerIdsWithUnknownHistory(): array
+    {
+        return Propietario::query()
+            ->where(fn ($query) => $query->whereHas('shareHoldings')->orWhereHas('shareContributions'))
+            ->with(['shareHoldings', 'shareContributions'])
+            ->get()
+            ->filter(fn (Propietario $owner): bool => $this->summary($owner)['has_unknown_history'])
+            ->pluck('id')
+            ->all();
+    }
+
     public function downloadReceipt(ShareContribution $contribution, User $actor): StreamedResponse
     {
         abort_unless($actor->can('view', $contribution), 403);

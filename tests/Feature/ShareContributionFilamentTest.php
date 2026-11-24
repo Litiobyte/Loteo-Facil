@@ -66,7 +66,7 @@ class ShareContributionFilamentTest extends TestCase
     {
         $owner = Propietario::factory()->create();
         $opening = app(ShareContributionService::class)->recordOpening($owner, '50', '1000', null, null, 'opening', $this->admin);
-        Livewire::test(ListShareContributions::class)->callTableAction('correct', $opening, [
+        Livewire::test(ListShareContributions::class)->set('activeTab', 'movimientos')->callTableAction('correct', $opening, [
             'corrected_amount' => '700', 'reason' => 'Corrección documentada', 'operation_key' => 'correct',
         ])->assertHasNoTableActionErrors();
         $this->assertSame('1000.00', $opening->fresh()->amount);
@@ -148,5 +148,46 @@ class ShareContributionFilamentTest extends TestCase
             'acquired_at' => today()->toDateString(), 'operation_key' => 'second',
         ])->assertHasNoTableActionErrors();
         $this->assertSame('25.00', app(ShareContributionService::class)->summary($owner)['recorded_amount']);
+    }
+
+    public function test_view_shows_stats_tabs_summary_and_information_state(): void
+    {
+        $knownZero = Propietario::factory()->create(['nombre' => 'Ana']);
+        $unknown = Propietario::factory()->create(['nombre' => 'Bruno']);
+        app(ShareContributionService::class)->recordOpening($knownZero, '10', '0', null, null, 'zero', $this->admin);
+        app(ShareHoldingService::class)->initializeHistorical($unknown, '5', null, 'unknown-hist', 'Sin registro', $this->admin);
+
+        $page = Livewire::test(ListShareContributions::class)
+            ->assertSee('Resumen por socio')
+            ->assertSee('Historial de movimientos')
+            ->assertSee('Aportes registrados')
+            ->assertSee('Socios sin información')
+            ->assertSee('$0')
+            ->assertSee('Historial desconocido')
+            ->assertSee('Historial conocido');
+
+        $this->assertSame('resumen', $page->instance()->activeTab);
+
+        // Estado de información por socio: $0 explícito ≠ histórico desconocido.
+        $page->set('activeTab', 'movimientos')
+            ->assertSee('Saldo histórico inicial')
+            ->assertSee('Registrado explícitamente como $0');
+    }
+
+    public function test_information_filter_and_detail_action_work_on_movements_tab(): void
+    {
+        $owner = Propietario::factory()->create();
+        $opening = app(ShareContributionService::class)->recordOpening($owner, '10', '500', null, 'Observación original', 'opening', $this->admin);
+        app(ShareHoldingService::class)->initializeHistorical(Propietario::factory()->create(), '5', null, 'unknown-hist', 'Sin registro', $this->admin);
+
+        Livewire::test(ListShareContributions::class)
+            ->set('activeTab', 'movimientos')
+            ->filterTable('informacion', 'desconocida')
+            ->assertCanNotSeeTableRecords([$opening])
+            ->set('tableFilters', ['informacion' => ['value' => 'completa']])
+            ->assertCanSeeTableRecords([$opening])
+            ->set('tableFilters', [])
+            ->callTableAction('detail', $opening)
+            ->assertSee('Observación original');
     }
 }
