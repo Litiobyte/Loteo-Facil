@@ -30,17 +30,17 @@ class OwnerLocationResolverTest extends TestCase
 
         $metropolitana = Region::query()->create(['nombre' => 'Metropolitana de Santiago']);
         $valparaiso = Region::query()->create(['nombre' => 'Valparaíso']);
-        Region::query()->create(['nombre' => 'Los Lagos']);
+        $losLagos = Region::query()->create(['nombre' => 'Los Lagos']);
         Region::query()->create(['nombre' => 'Los Ríos']);
 
-        Comuna::query()->create(['region_id' => $metropolitana->id, 'nombre' => 'Santiago']);
+        $santiago = Comuna::query()->create(['region_id' => $metropolitana->id, 'nombre' => 'Santiago']);
         $valparaisoComuna = Comuna::query()->create(['region_id' => $valparaiso->id, 'nombre' => 'Valparaíso']);
-        $osorno = Comuna::query()->create(['region_id' => 3, 'nombre' => 'Osorno']);
+        $osorno = Comuna::query()->create(['region_id' => $losLagos->id, 'nombre' => 'Osorno']);
 
         $this->regionValparaiso = $valparaiso->id;
         $this->regionMetropolitana = $metropolitana->id;
         $this->comunaValparaiso = $valparaisoComuna->id;
-        $this->comunaSantiago = 1;
+        $this->comunaSantiago = $santiago->id;
         $this->comunaOsorno = $osorno->id;
 
         $this->resolver = new OwnerLocationResolver;
@@ -66,9 +66,9 @@ class OwnerLocationResolverTest extends TestCase
 
     public function test_accepts_legacy_numeric_ids_and_rejects_unknown_ones(): void
     {
-        $resolved = $this->resolver->resolve(['region_id' => '1', 'comuna_id' => (string) $this->comunaSantiago]);
+        $resolved = $this->resolver->resolve(['region_id' => (string) $this->regionMetropolitana, 'comuna_id' => (string) $this->comunaSantiago]);
         $this->assertSame([], $resolved['errors']);
-        $this->assertSame(1, $resolved['data']['region_id']);
+        $this->assertSame($this->regionMetropolitana, $resolved['data']['region_id']);
         $this->assertSame($this->comunaSantiago, $resolved['data']['comuna_id']);
 
         $resolved = $this->resolver->resolve(['region_id' => '999']);

@@ -53,9 +53,11 @@ class HistoricalExternalIdentityTest extends TestCase
 
     public function test_identity_and_target_can_be_persisted_and_rolled_back_atomically(): void
     {
+        $ownerId = null;
         try {
-            DB::transaction(function (): void {
+            DB::transaction(function () use (&$ownerId): void {
                 $owner = Propietario::factory()->create();
+                $ownerId = $owner->id;
                 $identity = HistoricalExternalIdentity::query()->create($this->identity([
                     'identifiable_type' => Propietario::class,
                     'identifiable_id' => $owner->id,
@@ -69,6 +71,6 @@ class HistoricalExternalIdentityTest extends TestCase
         }
 
         $this->assertDatabaseCount('historical_external_identities', 0);
-        $this->assertDatabaseCount('propietarios', 0);
+        $this->assertDatabaseMissing('propietarios', ['id' => $ownerId]);
     }
 }

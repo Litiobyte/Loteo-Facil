@@ -60,6 +60,10 @@ class ShareContributionTest extends TestCase
 
     public function test_migration_preserves_existing_holdings_and_does_not_invent_contributions(): void
     {
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('Reejecución de migración con DDL sobre la conexión por defecto: solo SQLite.');
+        }
+
         $owner = Propietario::factory()->create();
         $holding = app(ShareHoldingService::class)->acquire($owner, '50', '2026-01-01', 'legacy-migration', 'Dato anterior', $this->admin);
         $before = $holding->fresh()->getAttributes();

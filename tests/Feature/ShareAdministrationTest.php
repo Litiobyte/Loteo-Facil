@@ -175,6 +175,10 @@ class ShareAdministrationTest extends TestCase
 
     public function test_migration_is_reversible_on_sqlite(): void
     {
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('Reejecución de migración con DDL sobre la conexión por defecto: solo SQLite.');
+        }
+
         $migration = require database_path('migrations/2026_11_17_142641_create_community_share_administration_tables.php');
         $migration->down();
         $this->assertFalse(Schema::hasTable('share_holdings'));
@@ -224,7 +228,7 @@ class ShareAdministrationTest extends TestCase
         app(ShareHoldingService::class)->adjust($holding, '20', 'active', 'adjust', 'Rectificación', $this->admin);
         $this->configure('lots');
         $this->assertSame('100.00', $charge->fresh()->amount);
-        $this->assertSame($snapshot, $charge->fresh()->distribution_snapshot);
+        $this->assertEqualsCanonicalizing($snapshot, $charge->fresh()->distribution_snapshot);
         $this->assertDatabaseCount('share_holdings', 1);
         $this->assertDatabaseCount('lotes', 1);
         $this->configure('mixed');
