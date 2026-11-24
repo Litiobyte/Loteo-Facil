@@ -4,10 +4,13 @@ namespace App\Filament\Admin\Resources\ExpenseResource\RelationManagers;
 
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Domain\Expenses\Enums\ExpenseDistributionType;
+use App\Models\PartnerCharge;
+use App\Support\ChargeSettlementPresentation;
 use Filament\Actions\Action;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ChargesRelationManager extends RelationManager
 {
@@ -20,6 +23,7 @@ class ChargesRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => ChargeSettlementPresentation::withAmounts($query))
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
@@ -33,9 +37,15 @@ class ChargesRelationManager extends RelationManager
                     ->money('CLP', locale: 'es_CL')
                     ->sortable(),
                 TextColumn::make('paid_amount')
-                    ->label('Pagado')
+                    ->label('Total aplicado (pagos y ajustes)')
                     ->money('CLP', locale: 'es_CL')
                     ->sortable(),
+                TextColumn::make('collection_applied_amount')
+                    ->label('Pagado con recaudaciones')
+                    ->money('CLP', locale: 'es_CL'),
+                TextColumn::make('non_monetary_applied_amount')
+                    ->label('Aplicado como ajuste no monetario')
+                    ->money('CLP', locale: 'es_CL'),
                 TextColumn::make('remaining_amount')
                     ->label('Saldo')
                     ->money('CLP', locale: 'es_CL')
@@ -43,13 +53,7 @@ class ChargesRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->label('Estado')
                     ->badge()
-                    ->formatStateUsing(fn (ChargeStatus $state): string => match ($state) {
-                        ChargeStatus::Pending => 'Pendiente',
-                        ChargeStatus::Partial => 'Parcial',
-                        ChargeStatus::Paid => 'Pagado',
-                        ChargeStatus::Cancelled => 'Cancelado',
-                        ChargeStatus::Consolidated => 'Consolidado',
-                    })
+                    ->formatStateUsing(fn (PartnerCharge $record): string => ChargeSettlementPresentation::statusLabel($record))
                     ->color(fn (ChargeStatus $state): string => match ($state) {
                         ChargeStatus::Pending => 'warning',
                         ChargeStatus::Partial => 'info',

@@ -17,7 +17,7 @@
     .oc-muted { color: var(--oc-muted); }
     .oc-button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; border: 1px solid var(--oc-line); border-radius: 9px; background: var(--oc-white); padding: 10px 14px; color: var(--oc-ink); font-size: 13px; font-weight: 650; white-space: nowrap; }
     .oc-button:hover { background: var(--oc-soft); border-color: var(--oc-green); }
-    .oc-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .oc-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; margin-bottom: 20px; }
     .oc-metric { background: var(--oc-white); border: 1px solid var(--oc-line); border-radius: 14px; padding: 19px 20px; min-height: 138px; box-shadow: 0 4px 17px rgb(30 55 46 / 2.5%); }
     .oc-metric-top { color: var(--oc-muted); font-size: 13px; font-weight: 600; }
     .oc-symbol { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--oc-soft); color: var(--oc-green); flex-shrink: 0; }
@@ -51,6 +51,7 @@
     .oc-charge .oc-button { padding: 8px 10px; font-size: 12px; }
     .oc-footer { padding: 14px 20px; color: var(--oc-muted); font-size: 11px; flex-wrap: wrap; }
     @media (max-width: 1200px) and (min-width: 761px) {
+        .oc-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .oc-list-head, .oc-charge { grid-template-columns: minmax(120px, 2fr) 80px repeat(3, minmax(65px, 1fr)) 90px 84px; gap: 8px; padding-inline: 13px; }
         .oc-money, .oc-concept h3 { font-size: 12px; } .oc-charge .oc-button { font-size: 11px; padding-inline: 5px; }
         .owner-charges { padding: 10px; }

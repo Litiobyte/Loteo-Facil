@@ -5,12 +5,15 @@ namespace App\Filament\Admin\Resources\ExpenseResource\Pages;
 use App\Domain\Expenses\Enums\ExpenseStatus;
 use App\Filament\Admin\Resources\ExpenseResource;
 use App\Filament\Admin\Resources\ExpenseResource\RelationManagers\FundingCollectionsRelationManager;
+use App\Filament\Concerns\HasDocumentManager;
 use App\Models\Expense;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewExpense extends ViewRecord
 {
+    use HasDocumentManager;
+
     protected static string $resource = ExpenseResource::class;
 
     protected function getHeaderActions(): array

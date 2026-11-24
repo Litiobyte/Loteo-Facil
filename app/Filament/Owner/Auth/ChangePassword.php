@@ -6,6 +6,7 @@ use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Facades\Filament;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +17,20 @@ use Illuminate\Validation\ValidationException;
  */
 class ChangePassword extends BaseEditProfile
 {
+    public function getHeading(): string|Htmlable|null
+    {
+        return $this->getUser()->getAttributeValue('must_change_password')
+            ? 'Establece tu contraseña personal'
+            : parent::getHeading();
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return $this->getUser()->getAttributeValue('must_change_password')
+            ? 'Tu contraseña inicial fue asignada por el sistema. Por seguridad, debes establecer una contraseña personal antes de continuar al portal.'
+            : parent::getSubheading();
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -27,17 +42,33 @@ class ChangePassword extends BaseEditProfile
 
     protected function getPasswordFormComponent(): Component
     {
-        return parent::getPasswordFormComponent()->label('Nueva contraseña')->required();
+        return parent::getPasswordFormComponent()
+            ->label('Nueva contraseña')
+            ->required()
+            ->helperText(fn (): ?string => $this->getUser()->getAttributeValue('must_change_password')
+                ? 'Escribe tu contraseña personal con al menos 8 caracteres.'
+                : null);
     }
 
     protected function getPasswordConfirmationFormComponent(): Component
     {
-        return parent::getPasswordConfirmationFormComponent()->label('Confirme la nueva contraseña')->required();
+        return parent::getPasswordConfirmationFormComponent()
+            ->label('Confirme la nueva contraseña')
+            ->required()
+            ->helperText(fn (): ?string => $this->getUser()->getAttributeValue('must_change_password')
+                ? 'Repite exactamente la nueva contraseña para confirmarla.'
+                : null);
     }
 
     protected function getCurrentPasswordFormComponent(): Component
     {
-        return parent::getCurrentPasswordFormComponent()->label('Contraseña actual')->visible(static fn (): bool => true);
+        $component = parent::getCurrentPasswordFormComponent()->label('Contraseña actual')->visible(static fn (): bool => true);
+
+        if ($this->getUser()->getAttributeValue('must_change_password')) {
+            $component->helperText('Ingresa la contraseña inicial asignada por el sistema, con la que acabas de iniciar sesión. Luego guarda los cambios para continuar.');
+        }
+
+        return $component;
     }
 
     /**

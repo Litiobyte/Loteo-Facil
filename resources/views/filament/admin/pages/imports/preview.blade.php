@@ -31,7 +31,7 @@
                 :color="$import->error_count > 0 ? 'warning' : 'info'"
                 :icon="$import->error_count > 0 ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-check-circle'"
                 :heading="$import->error_count > 0 ? 'Previsualización con observaciones — todavía sin cambios' : 'Validación completa — todavía sin cambios'"
-                :description="$import->error_count > 0 ? 'Los errores impiden importar esas filas. Puede corregir los datos, volver al mapeo o continuar: solo se ejecutarán las filas válidas. Los registros omitidos no se importarán.' : 'Los datos están listos para revisar. Ningún registro ha sido creado ni actualizado. Los registros omitidos no se importarán.'"
+                :description="$type === 'financial' ? 'El lote financiero es atómico: cualquier error impide registrar todos los movimientos nuevos. Corrija las observaciones antes de confirmar.' : ($import->error_count > 0 ? 'Los errores impiden importar esas filas. Puede corregir los datos, volver al mapeo o continuar: solo se ejecutarán las filas válidas. Los registros omitidos no se importarán.' : 'Los datos están listos para revisar. Ningún registro ha sido creado ni actualizado. Los registros omitidos no se importarán.')"
             />
         </div>
     </section>
@@ -78,7 +78,11 @@
     </section>
 
     <footer class="lf-import-preview-card lf-import-preview-footer">
-        <p><strong>{{ $import->error_count }} filas con errores</strong> no podrán importarse. Puede continuar para importar únicamente las filas válidas. Los registros omitidos no se importarán.</p>
+        @if ($type === 'financial')
+            <p><strong>{{ $import->error_count }} filas con errores.</strong> Si alguna fila falla, se revierte todo el lote.</p>
+        @else
+            <p><strong>{{ $import->error_count }} filas con errores</strong> no podrán importarse. Puede continuar para importar únicamente las filas válidas. Los registros omitidos no se importarán.</p>
+        @endif
         <div class="lf-import-preview-actions">
             <x-filament::button type="button" color="gray" outlined icon="heroicon-o-arrow-left" wire:click="remap">Anterior</x-filament::button>
             <x-filament::button type="button" color="gray" outlined icon="heroicon-o-arrow-down-tray" wire:click="downloadReport(false)">Descargar reporte completo</x-filament::button>

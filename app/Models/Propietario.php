@@ -35,6 +35,30 @@ class Propietario extends Model
         'email',
     ];
 
+    /**
+     * Campos que el propietario debe completar en "Mi perfil" del portal
+     * (debe coincidir con ManageUsers::profileFields()).
+     *
+     * @var list<string>
+     */
+    public const PROFILE_FIELDS = [
+        'nombre',
+        'apellido',
+        'rut',
+        'profesion',
+        'nacionalidad',
+        'email',
+        'telefono',
+        'direccion',
+        'region_id',
+        'comuna_id',
+    ];
+
+    public function isProfileComplete(): bool
+    {
+        return collect(static::PROFILE_FIELDS)->every(fn (string $field): bool => filled($this->{$field}));
+    }
+
     protected function nombreCompleto(): Attribute
     {
         return Attribute::make(

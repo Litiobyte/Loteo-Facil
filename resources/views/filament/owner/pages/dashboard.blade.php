@@ -8,6 +8,11 @@
 @use(Illuminate\Support\Number)
 
 <x-filament-panels::page>
+    @if ($owner && $communitySettings)
+        <x-filament::section heading="Documentos comunitarios">
+            @livewire('document-manager', ['entity' => $communitySettings, 'moduleKey' => 'comunidad'], key('community-documents'))
+        </x-filament::section>
+    @endif
     @include('filament.owner.pages.partials.dashboard-styles')
 
     <div class="owner-dashboard">
@@ -47,6 +52,13 @@
                     <p class="od-number">{{ Number::currency($summary['total_collections'], 'CLP', locale: 'es_CL') }}</p>
                     <p class="od-small">Recaudaciones registradas, sin anuladas</p>
                 </article>
+                @if ($summary['total_non_monetary_applied'] > 0)
+                    <article class="od-stat">
+                        <div class="od-stat-top"><span>Aplicado como ajuste no monetario</span><span class="od-stat-icon"><x-filament::icon icon="heroicon-o-document-check" /></span></div>
+                        <p class="od-number">{{ Number::currency($summary['total_non_monetary_applied'], 'CLP', locale: 'es_CL') }}</p>
+                        <p class="od-small">No es pago con recaudaciones ni ingreso de caja</p>
+                    </article>
+                @endif
                 @if ($usesShares)
                     <article class="od-stat">
                         <div class="od-stat-top"><span>Mis acciones</span><span class="od-stat-icon"><x-filament::icon icon="heroicon-o-chart-pie" /></span></div>
@@ -91,7 +103,7 @@
                                     </div>
                                     <div class="od-due-right">
                                         <strong>{{ Number::currency((float) $charge->remaining_amount, 'CLP', locale: 'es_CL') }}</strong>
-                                        <span class="od-tag {{ $charge->due_date?->isBefore(today()) ? 'od-danger' : 'od-warning' }}">{{ $charge->due_date?->isBefore(today()) ? 'Vencido' : ($charge->status->value === 'partial' ? 'Pago parcial' : 'Pendiente') }}</span>
+                                        <span class="od-tag {{ $charge->due_date?->isBefore(today()) ? 'od-danger' : 'od-warning' }}">{{ $charge->due_date?->isBefore(today()) ? 'Vencido' : ($charge->status->value === 'partial' ? 'Aplicación parcial' : 'Pendiente') }}</span>
                                     </div>
                                 </a>
                             @empty
@@ -121,9 +133,9 @@
                                     <tbody>
                                         @forelse ($movements as $movement)
                                             <tr wire:key="movement-{{ $movement['type'] }}-{{ $movement['related_id'] }}">
-                                                <td class="od-date">{{ $movement['date']->format('d/m/Y') }}</td>
+                                                <td class="od-date">{{ $movement['date_label'] ?? $movement['date']?->format('d/m/Y') ?? 'Desconocida' }}</td>
                                                 <td>{{ $movement['description'] }}</td>
-                                                <td><span class="od-tag {{ $movement['type'] === 'payment' ? 'od-success' : '' }}">{{ ['charge' => 'Cobro', 'payment' => 'Pago', 'allocation' => 'Aplicación'][$movement['type']] }}</span></td>
+                                                <td><span class="od-tag {{ $movement['type'] === 'payment' ? 'od-success' : '' }}">{{ ['charge' => 'Cobro', 'payment' => 'Pago', 'allocation' => 'Aplicación', 'historical_adjustment' => 'Ajuste histórico'][$movement['type']] }}</span></td>
                                                 <td class="od-sum">{{ Number::currency($movement['amount'], 'CLP', locale: 'es_CL') }}</td>
                                             </tr>
                                         @empty

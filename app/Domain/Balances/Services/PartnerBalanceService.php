@@ -3,6 +3,8 @@
 namespace App\Domain\Balances\Services;
 
 use App\Models\Collection;
+use App\Models\HistoricalAdjustment;
+use App\Models\HistoricalAdjustmentAllocation;
 use App\Models\PartnerCharge;
 use App\Models\Propietario;
 
@@ -31,7 +33,14 @@ class PartnerBalanceService
             ->whereIn('status', ['pending_application', 'partially_applied'])
             ->sum('unapplied_amount');
 
-        return round((float) $credit, 2);
+        $historical = HistoricalAdjustment::query()
+            ->where('propietario_id', $propietario->id)
+            ->where('category', 'credit_opening')->sum('amount');
+        $applied = HistoricalAdjustmentAllocation::query()
+            ->whereHas('adjustment', fn ($query) => $query->where('propietario_id', $propietario->id)->where('category', 'credit_opening'))
+            ->sum('amount');
+
+        return round((float) $credit + (float) $historical - (float) $applied, 2);
     }
 
     /**
@@ -41,7 +50,7 @@ class PartnerBalanceService
     {
         $total = PartnerCharge::query()
             ->where('propietario_id', $propietario->id)
-            ->where('charge_type', 'distribution')
+            ->whereIn('charge_type', ['distribution', 'opening_balance'])
             ->sum('amount');
 
         return round((float) $total, 2);
@@ -74,12 +83,23 @@ class PartnerBalanceService
     }
 
     /**
+     * Imputaciones de ajustes históricos, independientes de recaudaciones.
+     */
+    public function getTotalNonMonetaryApplied(Propietario $propietario): float
+    {
+        return round((float) HistoricalAdjustmentAllocation::query()
+            ->whereHas('adjustment', fn ($query) => $query->where('propietario_id', $propietario->id))
+            ->sum('amount'), 2);
+    }
+
+    /**
      * Get comprehensive balance summary for a propietario.
      *
      * @return array{
      *     total_charges: float,
      *     total_collections: float,
      *     total_applied: float,
+     *     total_non_monetary_applied: float,
      *     pending_balance: float,
      *     credit_balance: float,
      *     net_balance: float,
@@ -102,6 +122,7 @@ class PartnerBalanceService
             'total_charges' => $totalCharges,
             'total_collections' => $totalCollections,
             'total_applied' => $totalApplied,
+            'total_non_monetary_applied' => $this->getTotalNonMonetaryApplied($propietario),
             'pending_balance' => $pendingBalance,
             'credit_balance' => $creditBalance,
             'net_balance' => $netBalance,
@@ -160,7 +181,8 @@ class PartnerBalanceService
 
         // Rule 3: Total applied should equal total paid on charges
         $chargesTotalPaid = round((float) $totalPaid, 2);
-        $collectionsTotalApplied = round((float) $totalApplied, 2);
+        $historicalApplied = $this->getTotalNonMonetaryApplied($propietario);
+        $collectionsTotalApplied = round((float) $totalApplied + (float) $historicalApplied, 2);
 
         if (abs($chargesTotalPaid - $collectionsTotalApplied) > 0.01) {
             $errors[] = sprintf(

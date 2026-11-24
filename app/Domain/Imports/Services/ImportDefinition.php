@@ -24,6 +24,43 @@ class ImportDefinition
     public function fields(string $type): array
     {
         return match ($type) {
+            'financial_openings' => [
+                'source' => 'Fuente de identidad', 'movement_type' => 'Tipo de movimiento (initial_opening)',
+                'external_id' => 'ID externo', 'propietario_id' => 'ID propietario',
+                'cutoff_date' => 'Fecha de corte (AAAA-MM-DD)', 'opening_debt' => 'Deuda inicial',
+                'opening_credit' => 'Crédito inicial', 'concept' => 'Concepto',
+                'reference' => 'Referencia', 'observations' => 'Observaciones',
+                'information_source' => 'Fuente de información',
+            ],
+            'financial_collections' => [
+                'source' => 'Fuente', 'movement_type' => 'Tipo de movimiento (collection)',
+                'external_id' => 'ID externo de la recaudación', 'propietario_id' => 'ID propietario',
+                'collection_date' => 'Fecha real del pago (AAAA-MM-DD)', 'amount' => 'Monto',
+                'collection_method' => 'Método de pago', 'reference' => 'Referencia', 'observations' => 'Observaciones',
+                'mode' => 'Modalidad (automatic, manual, unapplied)',
+                'allocations' => 'Aplicaciones JSON: charge_id o charge_external_id, charge_source opcional, amount',
+            ],
+            'financial_charges' => [
+                'source' => 'Fuente', 'movement_type' => 'Tipo de movimiento (expense_charge)',
+                'external_id' => 'ID externo del cobro', 'mode' => 'Modalidad (linked, backing, opening)',
+                'propietario_id' => 'ID propietario', 'amount' => 'Monto histórico',
+                'origin_date' => 'Fecha de origen o corte (AAAA-MM-DD)', 'due_date' => 'Vencimiento (AAAA-MM-DD)',
+                'expense_id' => 'ID del gasto existente', 'expense_external_id' => 'ID externo del gasto',
+                'expense_source' => 'Fuente del gasto', 'expense_category_id' => 'ID categoría del gasto de respaldo',
+                'title' => 'Título del gasto de respaldo', 'reported_paid' => 'Monto pagado informado',
+                'reported_remaining' => 'Saldo pendiente informado', 'reference' => 'Referencia',
+                'observations' => 'Observaciones',
+            ],
+            'financial_expenses' => [
+                'source' => 'Fuente', 'movement_type' => 'Tipo de movimiento (expense)', 'external_id' => 'ID externo del gasto',
+                'title' => 'Descripción del gasto', 'description' => 'Detalle', 'expense_category_id' => 'ID categoría',
+                'supplier_id' => 'ID proveedor', 'expense_date' => 'Fecha original (AAAA-MM-DD)',
+                'due_date' => 'Vencimiento (AAAA-MM-DD)', 'amount' => 'Monto', 'distribution_type' => 'Tipo de distribución',
+                'mode' => 'Modalidad (register_only, distribute, explicit)',
+                'distribuir_con_datos_actuales' => 'Confirmar reconstrucción aproximada con datos actuales (sí)',
+                'reference' => 'Referencia', 'observations' => 'Observaciones',
+                'charges' => 'Cobros explícitos JSON: external_id, propietario_id, amount',
+            ],
             'owners' => [
                 'rut' => 'RUT', 'nombre' => 'Nombre', 'apellido' => 'Apellido', 'email' => 'Correo electrónico',
                 'user_id' => 'ID de cuenta propietario existente (deje vacío para crear cuenta)',

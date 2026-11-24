@@ -35,6 +35,15 @@ class OwnerImportAccountsTest extends TestCase
         $this->admin->assignRole('admin');
     }
 
+    public function test_csv_fixture_survives_reset_of_fake_local_disk(): void
+    {
+        $file = $this->csv([['12.345.678-5', 'Ana', 'Pérez', '', '']]);
+        Storage::fake('local');
+
+        $this->assertFileExists($file->getRealPath());
+        $this->assertStringContainsString('Ana', file_get_contents($file->getRealPath()));
+    }
+
     public function test_row_without_user_id_creates_account_owner_role_and_initial_password(): void
     {
         $import = $this->service->start($this->csv([['12.345.678-5', 'Ana', 'Pérez', 'ana@example.cl', '']]), 'owners', $this->admin);
@@ -151,8 +160,7 @@ class OwnerImportAccountsTest extends TestCase
     private function csv(array $rows): UploadedFile
     {
         $content = "RUT,Nombre,Apellido,Email,UserID\n".implode("\n", array_map(fn (array $row): string => implode(',', array_map(fn (string $value): string => '"'.str_replace('"', '""', $value).'"', $row)), $rows));
-        Storage::disk('local')->put('tmp/owners.csv', $content);
 
-        return new UploadedFile(Storage::disk('local')->path('tmp/owners.csv'), 'owners.csv', 'text/csv', null, true);
+        return UploadedFile::fake()->createWithContent('owners.csv', $content);
     }
 }

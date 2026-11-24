@@ -101,11 +101,13 @@ class PartnerStatementServiceTest extends TestCase
         // Arrange
         $oldCharge = PartnerCharge::factory()->create([
             'propietario_id' => $this->propietario->id,
+            'expense_id' => Expense::factory()->state(['due_date' => null]),
             'created_at' => Carbon::parse('2024-01-15'),
         ]);
 
         $recentCharge = PartnerCharge::factory()->create([
             'propietario_id' => $this->propietario->id,
+            'expense_id' => Expense::factory()->state(['due_date' => null]),
             'created_at' => Carbon::parse('2024-06-15'),
         ]);
 
@@ -276,11 +278,13 @@ class PartnerStatementServiceTest extends TestCase
         // Arrange
         PartnerCharge::factory()->create([
             'propietario_id' => $this->propietario->id,
+            'expense_id' => Expense::factory()->state(['due_date' => null]),
             'created_at' => Carbon::parse('2024-01-15'),
         ]);
 
         PartnerCharge::factory()->create([
             'propietario_id' => $this->propietario->id,
+            'expense_id' => Expense::factory()->state(['due_date' => null]),
             'created_at' => Carbon::parse('2024-06-15'),
         ]);
 

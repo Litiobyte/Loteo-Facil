@@ -77,7 +77,7 @@ abstract class ImportWizard extends Page
         }
         $this->importId = $id;
         $import = $this->getImport();
-        $this->mapping = $import->mapping ?? app(ImportDefinition::class)->autoMap($import->type, $import->headers);
+        $this->mapping = $import->mapping ?? $this->autoMap($import->headers);
         $this->duplicateMode = $import->duplicate_mode;
         $this->etapaId = $import->etapa_id;
         $this->step = match ($import->status) {
@@ -112,7 +112,7 @@ abstract class ImportWizard extends Page
         ]);
         $import = app(AdministrativeImportService::class)->start($this->file, $this->importType(), auth()->user(), $this->etapaId);
         $this->importId = $import->id;
-        $this->mapping = app(ImportDefinition::class)->autoMap($import->type, $import->headers);
+        $this->mapping = $this->autoMap($import->headers);
         $this->file = null;
         $this->step = 2;
     }
@@ -244,7 +244,7 @@ abstract class ImportWizard extends Page
     {
         $mapping = $import->mapping ?? [];
         $values = [];
-        foreach (app(ImportDefinition::class)->fields($import->type) as $field => $label) {
+        foreach ($this->importFields() as $field => $label) {
             $column = $mapping[$field] ?? null;
             $values[$field] = (string) ($row->overrides[$field] ?? $row->data[$field] ?? (($column !== null && $column !== '') ? ($row->raw[$column] ?? '') : ''));
         }
@@ -348,10 +348,24 @@ abstract class ImportWizard extends Page
 
         return [
             'import' => $import, 'type' => $this->importType(),
-            'fields' => app(ImportDefinition::class)->fields($this->importType()),
+            'fields' => $this->importFields(),
             'sample' => $import?->rows()->orderBy('number')->limit(5)->get(),
             'previewRows' => $import && $this->step >= 3 ? $this->previewRows($import) : null,
             'stages' => $this->importType() === 'lots' ? Etapa::query()->orderBy('numero')->get() : collect(),
         ];
+    }
+
+    /** @return array<string, string> */
+    protected function importFields(): array
+    {
+        return app(ImportDefinition::class)->fields($this->importType());
+    }
+
+    /** @param array<int, string> $headers
+     * @return array<string, int|string>
+     */
+    protected function autoMap(array $headers): array
+    {
+        return app(ImportDefinition::class)->autoMap($this->importType(), $headers);
     }
 }

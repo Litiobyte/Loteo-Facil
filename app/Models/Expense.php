@@ -48,6 +48,7 @@ class Expense extends Model
         'status' => ExpenseStatus::Registered,
         'funded_amount' => 0,
         'is_recurring' => false,
+        'historical_distribution_blocked' => false,
     ];
 
     /** @var list<string> */
@@ -69,6 +70,7 @@ class Expense extends Model
         'is_recurring',
         'recurrence_end_date',
         'parent_expense_id',
+        'historical_distribution_blocked',
     ];
 
     /**
@@ -86,6 +88,7 @@ class Expense extends Model
             'distributed_at' => 'datetime',
             'paid_at' => 'datetime',
             'is_recurring' => 'boolean',
+            'historical_distribution_blocked' => 'boolean',
             'recurrence_end_date' => 'date',
         ];
     }
@@ -144,6 +147,14 @@ class Expense extends Model
 
             /** @var self $original */
             $original = self::query()->findOrFail($expense->id);
+
+            if ($original->historical_distribution_blocked && $expense->isDirty('historical_distribution_blocked')) {
+                throw new DomainException('La exclusión histórica solo se modifica mediante una operación histórica autorizada.');
+            }
+            if ($original->historical_distribution_blocked && $original->status === ExpenseStatus::Registered
+                && array_diff(array_keys($expense->getDirty()), ['updated_at']) !== []) {
+                throw new DomainException('El gasto histórico registrado requiere una operación histórica autorizada para modificarse.');
+            }
 
             if ($original->status === ExpenseStatus::Registered) {
                 return;

@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\CommunitySettingResource\Pages;
 
 use App\Domain\Owners\Services\CommunitySettingsService;
 use App\Filament\Admin\Resources\CommunitySettingResource;
+use App\Filament\Concerns\HasDocumentManager;
 use App\Models\CommunitySetting;
 use DomainException;
 use Filament\Actions\Action;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 
 class EditCommunitySettings extends EditRecord
 {
+    use HasDocumentManager;
+
     protected static string $resource = CommunitySettingResource::class;
 
     public function mount(int|string|null $record = null): void

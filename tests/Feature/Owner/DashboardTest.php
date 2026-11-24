@@ -72,7 +72,7 @@ class DashboardTest extends TestCase
 
         $this->assertSame([
             'Mi comunidad', 'Mi participación', 'Mis cobros', 'Mis pagos',
-            'Estado de cuenta', 'Mi perfil', 'Mis lotes', 'Mapa del Loteo',
+            'Estado de cuenta', 'Mis documentos', 'Mi perfil', 'Mis lotes', 'Mapa del Loteo',
         ], $labels);
         foreach ($groups as $group) {
             $this->assertNull($group->getIcon());

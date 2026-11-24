@@ -5,5 +5,6 @@
             {{ $movement->context['status_before'] ?? '' }} → {{ $movement->context['status_after'] ?? '' }}.
             {{ $movement->reason }} (Administrador #{{ $movement->created_by }})
         </p>
+        @livewire('document-manager', ['entity' => $movement, 'moduleKey' => 'acciones'], key('share-movement-documents-'.$movement->id))
     @endforeach
 </div>

@@ -56,8 +56,15 @@ class TabularFileReader
                         throw ValidationException::withMessages(['file' => 'Máximo 2000 filas y 64 columnas. Divida archivos mayores.']);
                     }
                     $values = array_map(function (mixed $value): string {
+                        if ($value instanceof \DateTimeInterface) {
+                            if ($value->format('H:i:s.u') !== '00:00:00.000000') {
+                                throw ValidationException::withMessages(['file' => 'Las fechas deben omitir la hora; use fecha o texto ISO AAAA-MM-DD.']);
+                            }
+
+                            return $value->format('Y-m-d');
+                        }
                         if (! is_scalar($value) && $value !== null) {
-                            throw ValidationException::withMessages(['file' => 'Use texto o números, no fechas ni objetos.']);
+                            throw ValidationException::withMessages(['file' => 'Use texto, números o fechas; no se admiten otros objetos.']);
                         }
                         $text = trim((string) $value);
                         if (! mb_check_encoding($text, 'UTF-8') || strlen($text) > 10000) {

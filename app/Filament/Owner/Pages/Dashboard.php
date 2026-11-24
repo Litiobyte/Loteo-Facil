@@ -61,6 +61,7 @@ class Dashboard extends \Filament\Pages\Dashboard
 
         return [
             'owner' => $owner,
+            'communitySettings' => $settings,
             'communityName' => CommunitySetting::displayName(),
             'usesShares' => $settings?->usesShares() ?? false,
             'usesLots' => $settings?->usesLots() ?? true,

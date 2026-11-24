@@ -7,6 +7,7 @@ use App\Domain\Statements\Services\PartnerStatementService;
 use App\Filament\Owner\Resources\Cobros\MisCobrosResource;
 use App\Models\CommunitySetting;
 use App\Models\PartnerCharge;
+use App\Support\ChargeSettlementPresentation;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -135,6 +136,7 @@ class EstadoDeCuenta extends Page implements HasTable
             'cobrado' => (float) $summary['total_charges'],
             'pagado' => (float) $summary['total_collections'],
             'aplicado' => (float) $summary['total_applied'],
+            'ajustado' => (float) $summary['total_non_monetary_applied'],
             'pendiente' => (float) $summary['pending_balance'],
             'disponible' => (float) $summary['credit_balance'],
             'balance' => (float) $summary['net_balance'],
@@ -180,7 +182,7 @@ class EstadoDeCuenta extends Page implements HasTable
             ->query(function (): Builder {
                 $propietarioId = Auth::user()?->propietario?->id;
 
-                $query = PartnerCharge::query()
+                $query = ChargeSettlementPresentation::withAmounts(PartnerCharge::query())
                     ->where('propietario_id', $propietarioId)
                     ->whereIn('status', [ChargeStatus::Pending, ChargeStatus::Partial])
                     ->where('remaining_amount', '>', 0)
@@ -209,17 +211,7 @@ class EstadoDeCuenta extends Page implements HasTable
                 TextColumn::make('status')
                     ->label('Estado')
                     ->badge()
-                    ->formatStateUsing(function (ChargeStatus|string $state): string {
-                        $status = $state instanceof ChargeStatus ? $state : ChargeStatus::from($state);
-
-                        return match ($status) {
-                            ChargeStatus::Pending => 'Pendiente',
-                            ChargeStatus::Partial => 'Parcial',
-                            ChargeStatus::Paid => 'Pagado',
-                            ChargeStatus::Cancelled => 'Cancelado',
-                            ChargeStatus::Consolidated => 'Consolidado',
-                        };
-                    })
+                    ->formatStateUsing(fn (PartnerCharge $record): string => ChargeSettlementPresentation::statusLabel($record))
                     ->color(function (ChargeStatus|string $state): string {
                         $status = $state instanceof ChargeStatus ? $state : ChargeStatus::from($state);
 

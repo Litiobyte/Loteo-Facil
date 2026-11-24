@@ -17,7 +17,7 @@
             <span class="lf-import-intro-icon" aria-hidden="true">
                 <x-filament::icon :icon="match ($type) { 'owners' => 'heroicon-o-user-group', 'shares' => 'heroicon-o-chart-pie', default => 'heroicon-o-map' }" class="h-7 w-7" />
             </span>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Asistente de importación de {{ match ($type) { 'owners' => 'propietarios', 'shares' => 'saldos de acciones', default => 'lotes' } }} desde un archivo CSV o Excel.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Asistente de importación de {{ match ($type) { 'owners' => 'propietarios', 'shares' => 'saldos de acciones', 'financial' => 'movimientos financieros históricos', default => 'lotes' } }} desde un archivo CSV o Excel.</p>
         </div>
         <div class="lf-import-stepper">
             <div class="lf-import-stepper-content">
@@ -89,8 +89,8 @@
         <x-filament::callout
             color="info"
             icon="heroicon-o-information-circle"
-            :heading="'Importación de '.match ($type) { 'owners' => 'propietarios', 'shares' => 'saldos de acciones', default => 'lotes' }"
-            :description="$type === 'shares' ? 'Una fila por propietario existente: saldo consolidado de acciones y aporte histórico opcional.' : 'No importa acciones, aportes, saldos, asignaciones ni movimientos financieros.'"
+            :heading="'Importación de '.match ($type) { 'owners' => 'propietarios', 'shares' => 'saldos de acciones', 'financial' => 'movimientos financieros históricos', default => 'lotes' }"
+            :description="match ($type) { 'financial' => 'Solo super_admin. Ejecución atómica: si una fila falla, se revierte todo el lote. No hay reversión destructiva.', 'shares' => 'Una fila por propietario existente: saldo consolidado de acciones y aporte histórico opcional.', default => 'No importa acciones, aportes, saldos, asignaciones ni movimientos financieros.' }"
         >
             <x-slot:footer>
                 <details class="lf-import-considerations">
@@ -103,6 +103,22 @@
                         <p>Importe primero los propietarios. Use rut, quantity, amount, reference_date y notes. Los números usan punto decimal sin separadores de miles; las fechas usan AAAA-MM-DD. Un aporte vacío significa desconocido; 0 significa un aporte conocido de cero.</p>
                         <p>Las nuevas tenencias serán activas con la equivalencia m²/acción vigente. La fecha es de referencia del saldo, no reconstruye adquisiciones individuales. Si ya existen tenencias, solo puede conciliar un aporte conocido cuya cantidad coincida con el total, incluidas las inactivas; se conservan sus fechas y equivalencias.</p>
                         <p>No se sobrescriben aportes existentes. Los saldos idénticos ya importados se omiten, independientemente del modo seleccionado; los contradictorios se rechazan. Cada fila es atómica: las válidas se guardan y las fallidas se detallan en el reporte. No importa comprobantes, cuotas ni pagos de gastos comunes.</p>
+                    @elseif ($type === 'financial')
+                        @if ($this->financialType === 'openings')
+                        <p>Una fila por saldo inicial: source, movement_type=initial_opening, external_id, propietario_id, cutoff_date, opening_debt, opening_credit e information_source son obligatorios. Indique deuda o crédito mayor que cero y use 0 en el otro campo; nunca ambos.</p>
+                        <p>cutoff_date es la fecha diaria de corte. information_source debe describir el respaldo de donde proviene el saldo. Concepto, referencia y observaciones son opcionales.</p>
+                        @elseif ($this->financialType === 'collections')
+                        <p>Una fila por recaudación documentada: source, movement_type=collection, external_id, propietario_id, collection_date, amount, collection_method y mode. Puede usar un mismo modo en toda la importación o mezclar modos por fila.</p>
+                        @elseif ($this->financialType === 'expenses')
+                        <p>Una fila por gasto: source, movement_type=expense, external_id, title, expense_category_id, expense_date, amount, distribution_type y mode. Categoría y proveedor usan IDs existentes. Modalidades: register_only (solo registrar), distribute (datos actuales) y explicit (cobros históricos explícitos).</p>
+                        <p>La columna charges contiene una lista JSON; cada objeto requiere external_id, propietario_id y amount como texto. En CSV entrecomille toda la celda y duplique las comillas internas; en XLSX use una celda de texto. Puede corregir el JSON antes de ejecutar.</p>
+                        @elseif ($this->financialType === 'charges')
+                        <p>Una fila por cobro: source, movement_type=expense_charge, external_id, mode, propietario_id, amount positivo y origin_date. Elija la modalidad en la columna mode de cada fila; puede mezclar modalidades en un archivo. reported_paid y reported_remaining solo informan conciliación: nunca crean pagos.</p>
+                        @else
+                        <p>Campos obligatorios: source, movement_type, external_id, propietario_id, amount y effective_date. Use el ID de un propietario existente. Opcionales: charge_id, reference y observations.</p>
+                        <p>Tipos admitidos: opening_balance, debt_correction, debt_forgiveness y unexplained_difference. Corrección y condonación requieren charge_id. Las aperturas positivas son deuda; las negativas, crédito. No importa gastos ni recaudaciones.</p>
+                        @endif
+                        <p>Fechas diarias AAAA-MM-DD. Montos decimales sin miles (1000.00) o formato chileno inequívoco (1.000,00); evite 1.000 por ambiguo. Los períodos cerrados se rechazan. La identidad source + movement_type + external_id es estable: no se sobrescribe contenido contradictorio.</p>
                     @else
                         <p>La etapa se selecciona aquí; el código de lote es único en toda la instalación. Para lotes nuevos use superficie entera positiva en m² y estado disponible, reservado o vendido. En existentes solo se actualizan notas: cambios de superficie o estado se rechazan para proteger la cobranza. No es una importación geográfica KMZ/KML.</p>
                     @endif
@@ -110,6 +126,61 @@
                 </details>
             </x-slot:footer>
         </x-filament::callout>
+
+        @if ($type === 'financial' && $this->financialType === 'openings')
+            <x-filament::callout color="info" icon="heroicon-o-information-circle" heading="Fuente de información obligatoria y dirección del saldo">
+                <x-slot:description>
+                    <p>Describa en information_source el libro, planilla, sistema o respaldo usado para establecer cada saldo inicial.</p>
+                    <p>Si opening_debt y opening_credit son mayores que cero, la fila se rechaza: indique una sola dirección, sin calcular un neto. Si ambos son cero, la fila queda omitida y no genera movimiento.</p>
+                </x-slot:description>
+            </x-filament::callout>
+            <x-filament::callout color="warning" icon="heroicon-o-exclamation-triangle"
+                heading="Apertura financiera sin movimiento de caja"
+                description="Una apertura no representa un gasto ni una recaudación nueva, no crea esos movimientos y no modifica la caja. El saldo deudor establece deuda inicial y el acreedor genera crédito utilizable. El corte inclusivo y los períodos cerrados se validan al ejecutar." />
+        @endif
+
+        @if ($type === 'financial' && $this->financialType === 'expenses')
+            <x-filament::callout color="warning" icon="heroicon-o-exclamation-triangle"
+                heading="Reconstrucción aproximada, no historia verificada"
+                description="La modalidad distribute usa participaciones y datos vigentes, no verifica la distribución histórica. Exige distribuir_con_datos_actuales=sí en cada fila, sin valor por defecto. Si no puede confirmarlo, use register_only o explicit." />
+            <x-filament::callout color="info" icon="heroicon-o-information-circle" heading="Revisar cobros explícitos">
+                <x-slot:description>
+                    Ejemplo de celda charges: <code>[{"external_id":"COBRO-1","propietario_id":123,"amount":"1000.00"}]</code>.
+                    Revise que los montos cuadren con el gasto: el servicio rechaza una suma superior; admite una suma menor como información histórica incompleta, sin completar ni redistribuir la diferencia. No se importan pagos ni recaudaciones.
+                </x-slot:description>
+            </x-filament::callout>
+        @endif
+
+        @if ($type === 'financial' && $this->financialType === 'charges')
+            <x-filament::callout color="info" icon="heroicon-o-information-circle" heading="Modalidades de cobros históricos">
+                <x-slot:description>
+                    <p>linked — Vinculado: indique expense_id o expense_external_id de un gasto existente; expense_source es opcional. Si indica ambas referencias, deben coincidir.</p>
+                    <p>backing — Gasto de respaldo histórico: exige expense_external_id nuevo, expense_category_id y title. No redistribuye el gasto.</p>
+                    <p>opening — Apertura: origin_date es el corte inclusivo; no admite gasto ni vencimiento. Exige un propietario sin movimientos previos.</p>
+                    <p>Los nuevos cobros parten pendientes, sin aplicaciones. Las diferencias de montos pagados o pendientes informados se muestran en el mensaje de resultado, sin alterar saldos.</p>
+                </x-slot:description>
+            </x-filament::callout>
+            <x-filament::callout color="warning" icon="heroicon-o-exclamation-triangle"
+                heading="Respaldo técnico, no total histórico acreditado"
+                description="En modalidad backing el gasto de respaldo usa únicamente el monto conocido del cobro: no acredita el total histórico original del gasto. Permanece bloqueado para distribución automática." />
+        @endif
+
+        @if ($type === 'financial' && $this->financialType === 'collections')
+            <x-filament::callout color="info" icon="heroicon-o-information-circle" heading="Aplicación de recaudaciones históricas">
+                <x-slot:description>
+                    <p>automatic — Automática: FIFO vigente; no reconstruye aplicaciones históricas. Si no hay cobros pendientes, use unapplied.</p>
+                    <p>manual — Manual: indique los cobros destino y montos en allocations. Ejemplo por ID: <code>[{"charge_id":123,"amount":"1000.00"}]</code>. Por identidad externa: <code>[{"charge_external_id":"COBRO-1","charge_source":"libro","amount":"1000.00"}]</code>. Sin charge_source se usa source de la recaudación.</p>
+                    <p>unapplied — Sin aplicación: deja todo el importe disponible. allocations debe estar vacío tanto en automatic como en unapplied. El servicio valida propietario, referencias y límites; un exceso manual se rechaza.</p>
+                    <p>collection_method: efectivo, transferencia, cheque u otro. En CSV entrecomille la celda JSON y duplique las comillas internas; en XLSX use texto. Puede corregir modalidad y JSON antes de ejecutar.</p>
+                </x-slot:description>
+            </x-filament::callout>
+            <x-filament::callout color="warning" icon="heroicon-o-exclamation-triangle" heading="Fecha real obligatoria y períodos protegidos">
+                <x-slot:description>
+                    <p>collection_date es la fecha real completa del pago; la incorporación técnica se registra por separado. Las aplicaciones importadas usan la fecha real del pago.</p>
+                    <p>Si desconoce la fecha de aplicación, considere sin aplicación; aun así, registrar la recaudación exige fecha real completa conocida. No invente una fecha. Se rechazan períodos cerrados, también de cobros destino, y fechas anteriores o iguales al corte inclusivo de apertura.</p>
+                </x-slot:description>
+            </x-filament::callout>
+        @endif
 
         @if ($errors->any())
             <x-filament::callout
@@ -136,6 +207,16 @@
                     icon="heroicon-o-cloud-arrow-up"
                 >
                     <div class="grid gap-6">
+                        @if ($type === 'financial')
+                            <fieldset>
+                                <legend>Tipo de importación financiera</legend>
+                                <x-filament::button type="button" :color="$this->financialType === 'adjustments' ? 'primary' : 'gray'" wire:click="selectFinancialType('adjustments')">Aperturas y ajustes</x-filament::button>
+                                <x-filament::button type="button" :color="$this->financialType === 'openings' ? 'primary' : 'gray'" wire:click="selectFinancialType('openings')">Saldos iniciales</x-filament::button>
+                                <x-filament::button type="button" :color="$this->financialType === 'expenses' ? 'primary' : 'gray'" wire:click="selectFinancialType('expenses')">Gastos históricos</x-filament::button>
+                                <x-filament::button type="button" :color="$this->financialType === 'charges' ? 'primary' : 'gray'" wire:click="selectFinancialType('charges')">Cobros históricos</x-filament::button>
+                                <x-filament::button type="button" :color="$this->financialType === 'collections' ? 'primary' : 'gray'" wire:click="selectFinancialType('collections')">Recaudaciones históricas</x-filament::button>
+                            </fieldset>
+                        @endif
                         <div @class(['grid gap-5', 'md:grid-cols-2' => $type === 'lots'])>
                             @if ($type === 'lots')
                                 <div class="grid content-start gap-2">
@@ -157,7 +238,7 @@
                             <div @class(['lf-import-upload', 'lf-import-upload-loaded' => $file !== null]) data-import-upload>
                                 <span class="lf-import-upload-icon" aria-hidden="true"><x-filament::icon icon="heroicon-o-cloud-arrow-up" class="h-8 w-8" /></span>
                                 <strong>Seleccione su archivo para comenzar</strong>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">Haga clic o arrastre un archivo aquí para cargar los datos administrativos.</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">Haga clic o arrastre un archivo aquí para cargar {{ $type === 'financial' ? 'los movimientos históricos' : 'los datos administrativos' }}.</span>
                                 <x-filament::badge color="gray">CSV o XLSX · Máximo 5 MB</x-filament::badge>
                             <x-filament::input.wrapper>
                                 <x-filament::input id="import-file" type="file" wire:model="file" accept=".csv,.xlsx" required aria-describedby="import-file-help" />
@@ -176,7 +257,9 @@
                             </div>
                             <div class="flex flex-wrap gap-3">
                                 <x-filament::button type="button" color="gray" outlined icon="heroicon-o-arrow-down-tray" wire:click="downloadTemplate('csv')">Plantilla CSV</x-filament::button>
-                                <x-filament::button type="button" color="gray" outlined icon="heroicon-o-arrow-down-tray" wire:click="downloadTemplate('xlsx')">Plantilla XLSX</x-filament::button>
+                                @if ($type !== 'financial')
+                                    <x-filament::button type="button" color="gray" outlined icon="heroicon-o-arrow-down-tray" wire:click="downloadTemplate('xlsx')">Plantilla XLSX</x-filament::button>
+                                @endif
                                 @if ($type === 'owners')
                                     <x-filament::button type="button" color="gray" outlined icon="heroicon-o-document-arrow-down" wire:click="downloadAccounts">Cuentas disponibles (ID/correo)</x-filament::button>
                                 @endif
@@ -249,6 +332,7 @@
                             La asignación puede modificarse antes de validar. Las columnas no mapeadas se ignoran.
                         </p>
 
+                        @if ($type !== 'financial')
                         <div class="grid max-w-xl gap-2 rounded-xl border border-gray-200 p-4 dark:border-white/10 dark:bg-white/5">
                             <label for="duplicates" class="text-sm font-semibold text-gray-950 dark:text-white">Registros existentes</label>
                             <p class="text-sm leading-6 text-gray-500 dark:text-gray-400">Defina cómo tratar los registros que ya existen en el sistema.</p>
@@ -260,6 +344,9 @@
                             </x-filament::input.wrapper>
                             @error('duplicateMode')<p role="alert" class="text-sm text-danger-600 dark:text-danger-400">{{ $message }}</p>@enderror
                         </div>
+                        @else
+                            <p>Las identidades existentes idénticas se omiten. Los conflictos requieren revisión manual; nunca se actualizan movimientos existentes.</p>
+                        @endif
 
                         @error('mapping')<p role="alert" class="text-sm text-danger-600 dark:text-danger-400">{{ $message }}</p>@enderror
                         @error('import')<p role="alert" class="text-sm text-danger-600 dark:text-danger-400">{{ $message }}</p>@enderror
@@ -399,7 +486,7 @@
                     @if ($import->status === 'preview')
                         <form wire:submit="execute" class="lf-import-preview-confirmation">
                             <div class="lf-import-preview-field">
-                                <p>Solo se ejecutarán filas válidas; las rechazadas permanecerán en el reporte. No hay eliminación ni reversión masiva.</p>
+                                <p>{{ $type === 'financial' ? 'Se confirma el lote completo de forma atómica. Si una fila falla, no se registra ningún movimiento nuevo. No hay reversión destructiva.' : 'Solo se ejecutarán filas válidas; las rechazadas permanecerán en el reporte. No hay eliminación ni reversión masiva.' }}</p>
                                 <div class="lf-import-execution-confirmed">
                                     <x-filament::input.checkbox id="import-confirmed" wire:model="confirmed" />
                                     <label for="import-confirmed" class="text-sm font-medium leading-6 text-gray-950 dark:text-white">Confirmo las creaciones y actualizaciones de esta previsualización.</label>
@@ -421,6 +508,17 @@
                         </form>
                     @else
                         <p>Ejecución finalizada. Los reportes permanecen disponibles para su revisión.</p>
+                        @if ($type === 'financial' && $hasConflictRows)
+                            <p role="alert">Hay conflictos de identidad: requieren revisión manual. No se sobrescriben ni se reintentan automáticamente.</p>
+                        @endif
+                        @if ($type === 'financial' && auth()->user()->hasRole('super_admin') && $hasFailedRows)
+                            <form wire:submit="retryFailed" wire:confirm="¿Reintentar únicamente las filas fallidas? Los resultados confirmados no se modificarán.">
+                                <x-filament::input.checkbox id="import-retry-confirmed" wire:model="confirmed" />
+                                <label for="import-retry-confirmed">Confirmo el reintento de las filas fallidas.</label>
+                                @error('confirmed')<p role="alert">{{ $message }}</p>@enderror
+                                <x-filament::button type="submit" wire:loading.attr="disabled" wire:target="retryFailed">Reintentar filas fallidas</x-filament::button>
+                            </form>
+                        @endif
                     @endif
                 </footer>
             </div>

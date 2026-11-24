@@ -81,8 +81,12 @@ class PartnerCharge extends Model
 
             $validator = Validator::make($charge->attributesToArray(), [
                 'propietario_id' => ['required', 'exists:propietarios,id'],
-                'expense_id' => [$charge->charge_type === 'distribution' ? 'required' : 'nullable', 'exists:expenses,id'],
-                'charge_type' => ['required', Rule::in(['distribution', 'balance_consolidation'])],
+                'expense_id' => array_merge(
+                    $charge->charge_type === 'distribution' ? ['required'] : ['nullable'],
+                    $charge->charge_type === 'opening_balance' ? ['prohibited'] : [],
+                    ['exists:expenses,id'],
+                ),
+                'charge_type' => ['required', Rule::in(['distribution', 'balance_consolidation', 'opening_balance'])],
                 'amount' => ['required', 'numeric', 'gt:0'],
                 'paid_amount' => ['required', 'numeric', 'gte:0', 'lte:amount'],
                 'remaining_amount' => ['required', 'numeric', 'gte:0'],
@@ -113,7 +117,11 @@ class PartnerCharge extends Model
                 throw new DomainException('No se puede modificar un cobro cuyo saldo fue consolidado.');
             }
 
-            if ($closingService->isDateInClosedPeriod($original->created_at)) {
+            if ($original->charge_type === 'opening_balance' && array_diff(array_keys($charge->getDirty()), ['paid_amount', 'remaining_amount', 'status', 'updated_at']) !== []) {
+                throw new DomainException('La apertura histórica no se modifica; registre un movimiento compensatorio.');
+            }
+
+            if ($closingService->isDateInClosedPeriod($closingService->chargeImputationDate($original))) {
                 $dirty = array_keys($charge->getDirty());
                 $allowedForCollectionApplication = [
                     'paid_amount',

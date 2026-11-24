@@ -24,14 +24,17 @@ class ChargeGenerationService
      *
      * @throws DomainException
      */
-    public function generateChargesFromExpense(Expense $expense): Collection
+    public function generateChargesFromExpense(Expense $expense, ?string $imputationDate = null): Collection
     {
-        return DB::transaction(function () use ($expense): Collection {
+        return DB::transaction(function () use ($expense, $imputationDate): Collection {
             $expense = Expense::query()->lockForUpdate()->findOrFail($expense->getKey());
             CommunitySetting::query()->lockForUpdate()->findOrFail(1);
 
             if ($expense->status !== ExpenseStatus::Registered) {
                 throw new DomainException('Solo se puede generar cobros para un gasto en estado registrado.');
+            }
+            if ($expense->historical_distribution_blocked) {
+                throw new DomainException('El gasto histórico requiere distribución explícita autorizada.');
             }
 
             if (PartnerCharge::byExpense($expense->id)->exists()) {
@@ -52,6 +55,7 @@ class ChargeGenerationService
                 $charge = PartnerCharge::create([
                     'propietario_id' => $row['propietario_id'],
                     'expense_id' => $expense->id,
+                    'imputation_date' => $imputationDate,
                     'amount' => $row['amount'],
                     'paid_amount' => 0,
                     'status' => ChargeStatus::Pending,

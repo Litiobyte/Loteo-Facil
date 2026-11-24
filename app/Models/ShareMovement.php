@@ -4,10 +4,16 @@ namespace App\Models;
 
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ShareMovement extends Model
 {
     protected $guarded = ['id'];
+
+    public function holding(): BelongsTo
+    {
+        return $this->belongsTo(ShareHolding::class, 'share_holding_id');
+    }
 
     protected function casts(): array
     {

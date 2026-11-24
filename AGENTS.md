@@ -9,6 +9,11 @@ This file defines how to use project agents and skills consistently across openc
 - Add tests for all financial rule changes.
 - Prioritize correctness and traceability over speed.
 
+## Financial Historical Imports Module
+
+- Cuando se trabaje en el módulo de importaciones financieras históricas (gastos, cobros, recaudaciones, saldos iniciales, conciliación histórica), leer y contrastar `docs/IMPORTACION_FINANCIERA_PROGRESS.md` antes de empezar y actualizarlo al terminar cada bloque de trabajo.
+- Ese archivo es la fuente de verdad del avance del módulo; no marcar tareas sin verificar y no borrar decisiones anteriores silenciosamente.
+
 ## Agent Directory
 
 - `laravel-architect`:

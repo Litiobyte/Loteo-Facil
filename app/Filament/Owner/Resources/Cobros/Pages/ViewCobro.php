@@ -5,6 +5,7 @@ namespace App\Filament\Owner\Resources\Cobros\Pages;
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Filament\Owner\Resources\Cobros\MisCobrosResource;
 use App\Models\PartnerCharge;
+use App\Support\ChargeSettlementPresentation;
 use App\Support\ChileanNumber;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -32,9 +33,11 @@ class ViewCobro extends ViewRecord
                         TextEntry::make('consolidation')->label('Consolidación')->badge()->color('gray')->state(fn (PartnerCharge $record): ?string => MisCobrosResource::consolidationLabel($record)),
                         TextEntry::make('description')->label('Descripción')->placeholder('-'),
                         TextEntry::make('amount')->label('Monto total')->money('CLP', locale: 'es_CL'),
-                        TextEntry::make('paid_amount')->label('Pagado')->money('CLP', locale: 'es_CL'),
+                        TextEntry::make('paid_amount')->label('Total aplicado (pagos y ajustes)')->money('CLP', locale: 'es_CL'),
+                        TextEntry::make('collection_applied_amount')->label('Pagado con recaudaciones')->money('CLP', locale: 'es_CL'),
+                        TextEntry::make('non_monetary_applied_amount')->label('Aplicado como ajuste no monetario')->money('CLP', locale: 'es_CL'),
                         TextEntry::make('remaining_amount')->label('Pendiente')->state(fn (PartnerCharge $record): string => $record->status === ChargeStatus::Consolidated ? '0' : $record->remaining_amount)->money('CLP', locale: 'es_CL'),
-                        TextEntry::make('status')->label('Estado')->badge()->formatStateUsing(fn ($state): string => MisCobrosResource::statusLabel($state))->color(fn ($state): string => MisCobrosResource::statusColor($state)),
+                        TextEntry::make('status')->label('Estado')->badge()->formatStateUsing(fn (PartnerCharge $record): string => ChargeSettlementPresentation::statusLabel($record))->color(fn ($state): string => MisCobrosResource::statusColor($state)),
                         TextEntry::make('due_date')->label('Fecha vencimiento')->date('d/m/Y'),
                         TextEntry::make('created_at')->label('Fecha creación')->dateTime('d/m/Y H:i'),
                     ]),

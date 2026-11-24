@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\CollectionResource\Pages;
 
 use App\Domain\Collections\Services\CollectionApplicationService;
 use App\Filament\Admin\Resources\CollectionResource;
+use App\Filament\Concerns\HasDocumentManager;
 use App\Models\Collection;
 use App\Models\CollectionAllocation;
 use DomainException;
@@ -14,6 +15,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewCollection extends ViewRecord
 {
+    use HasDocumentManager;
+
     protected static string $resource = CollectionResource::class;
 
     protected function getHeaderActions(): array

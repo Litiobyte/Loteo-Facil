@@ -11,36 +11,32 @@ class LandingPageTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertViewIs('welcome')
-            ->assertSee('<html lang="es">', escape: false)
-            ->assertSee('branding/logo-full-transparent.png', escape: false)
-            ->assertSee('Tu comunidad,')
-            ->assertSee('Mis cobros')
-            ->assertSee('Mis pagos')
-            ->assertSee('Mi estado de cuenta')
-            ->assertSee('Tu participación')
-            ->assertSee('Vista ilustrativa')
-            ->assertSee('Solicita tu cuenta a la administración de tu comunidad.')
+            ->assertSee('<html lang="es-CL">', escape: false)
+            ->assertSee('Software de administración de loteos en Chile | Loteo Fácil', escape: false)
+            ->assertSee('La administración de tu loteo,', escape: false)
+            ->assertSee('por fin en orden.', escape: false)
+            ->assertSee('id="funcionalidades"', escape: false)
+            ->assertSee('id="como-funciona"', escape: false)
+            ->assertSee('id="modalidades"', escape: false)
+            ->assertSee('id="preguntas"', escape: false)
+            ->assertSee('Vista ilustrativa del sistema', escape: false)
+            ->assertSee('Portal propietario', escape: false)
             ->assertDontSee("Let's get started")
             ->assertDontSee('https://laravel.com/docs');
     }
 
-    public function test_landing_links_to_the_registered_owner_and_admin_logins(): void
+    public function test_landing_links_to_the_registered_owner_login(): void
     {
         $ownerLogin = route('filament.owner.auth.login');
-        $adminLogin = route('filament.admin.auth.login');
 
         $this->assertSame(url('/propietario/login'), $ownerLogin);
-        $this->assertSame(url('/admin/login'), $adminLogin);
 
         $this->get('/')
             ->assertOk()
             ->assertSee('href="'.$ownerLogin.'"', escape: false)
-            ->assertSee('href="'.$adminLogin.'"', escape: false)
-            ->assertSee('Soy propietario')
-            ->assertSee('Soy administrador')
-            ->assertSee('href="#contenido"', escape: false)
-            ->assertSee('id="contenido"', escape: false)
-            ->assertSee('href="#beneficios"', escape: false)
-            ->assertSee('id="beneficios"', escape: false);
+            ->assertSee('Acceso a propietarios', escape: false)
+            ->assertSee('href="#funcionalidades"', escape: false)
+            ->assertSee('href="#como-funciona"', escape: false)
+            ->assertSee('href="#preguntas"', escape: false);
     }
 }

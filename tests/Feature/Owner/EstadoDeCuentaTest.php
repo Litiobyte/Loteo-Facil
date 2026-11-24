@@ -6,6 +6,7 @@ use App\Domain\Charges\Enums\ChargeStatus;
 use App\Domain\Collections\Enums\CollectionStatus;
 use App\Filament\Owner\Pages\EstadoDeCuenta;
 use App\Models\Collection;
+use App\Models\Expense;
 use App\Models\PartnerCharge;
 use App\Models\Propietario;
 use App\Models\User;
@@ -61,6 +62,7 @@ class EstadoDeCuentaTest extends TestCase
         $charge = PartnerCharge::factory()->create([
             'propietario_id' => $owner->id,
             'amount' => 15000,
+            'expense_id' => Expense::factory()->state(['due_date' => null]),
             'paid_amount' => 0,
             'due_date' => today()->subMonths(2),
             'created_at' => now()->subMonths(2),

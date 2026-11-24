@@ -14,6 +14,10 @@
                 @php
                     $rowState = $row->result ?? $row->action;
                     $rowPresentation = match ($rowState) {
+                        'created' => ['color' => 'success', 'icon' => 'heroicon-o-check-circle', 'label' => 'Creado (created)'],
+                        'skipped' => ['color' => 'warning', 'icon' => 'heroicon-o-exclamation-triangle', 'label' => 'Omitido (skipped)'],
+                        'failed' => ['color' => 'danger', 'icon' => 'heroicon-o-x-circle', 'label' => 'Fallido (failed)'],
+                        'conflict' => ['color' => 'danger', 'icon' => 'heroicon-o-exclamation-triangle', 'label' => 'Conflicto (conflict) · Revisión manual'],
                         'create' => ['color' => 'success', 'icon' => 'heroicon-o-check-circle', 'label' => 'Crear'],
                         'update' => ['color' => 'info', 'icon' => 'heroicon-o-arrow-path', 'label' => 'Actualizar'],
                         'skip' => ['color' => 'warning', 'icon' => 'heroicon-o-exclamation-triangle', 'label' => 'Omitir / advertencia'],
@@ -29,6 +33,9 @@
                         </x-filament::badge>
                     </td>
                     <td class="px-4 py-4 break-words">
+                        @if ($row->result && isset($row->changes['result_message']['after']) && count($row->errors ?? []) === 0)
+                            <p>{{ $row->changes['result_message']['after'] }}</p>
+                        @endif
                         <div class="grid gap-1">
                             @if ($row->data === null)
                                 <span class="font-mono text-xs">{{ json_encode($row->raw, JSON_UNESCAPED_UNICODE) }}</span>

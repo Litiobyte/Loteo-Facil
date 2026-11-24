@@ -44,7 +44,7 @@
                     ['Saldo pendiente', Number::currency($resumen['pendiente'], 'CLP', locale: 'es_CL'), $pendingCharges->count().' cobros con saldo por pagar', 'heroicon-o-arrow-trending-up'],
                     ['Saldo a favor', Number::currency($resumen['disponible'], 'CLP', locale: 'es_CL'), 'Disponible para futuros cobros', 'heroicon-o-wallet'],
                     ['Pagado en el período', Number::currency($periodPaid, 'CLP', locale: 'es_CL'), 'Pagos registrados en el filtro, sin anulados', 'heroicon-o-check'],
-                    ['Cobros pendientes', $pendingCharges->count(), $overdue->count().' vencidos · '.$partialCount.' con abono parcial', 'heroicon-o-document-text'],
+                    ['Cobros pendientes', $pendingCharges->count(), $overdue->count().' vencidos · '.$partialCount.' con aplicación parcial', 'heroicon-o-document-text'],
                 ] as [$label, $value, $hint, $icon])
                     <article class="os-panel os-metric {{ $loop->first ? 'os-main-metric' : '' }}">
                         <div class="os-metric-top"><span>{{ $label }}</span><span class="os-symbol"><x-filament::icon :icon="$icon" /></span></div>
@@ -68,9 +68,9 @@
                                 <tbody>
                                     @forelse ($timeline as $event)
                                         <tr>
-                                            <td class="os-date">{{ $event['date']->format('d/m/Y') }}<div class="os-small">{{ $event['date']->format('H:i') }}</div></td>
+                                            <td class="os-date">{{ $event['date_label'] ?? $event['date']?->format('d/m/Y') ?? 'Desconocida' }}@if ($event['date'])<div class="os-small">{{ $event['date']->format('H:i') }}</div>@endif</td>
                                             <td><strong>{{ $event['description'] }}</strong></td>
-                                            <td><span class="os-badge {{ $event['type'] === 'payment' ? 'os-good' : ($event['type'] === 'charge' ? 'os-warn' : '') }}">{{ ['charge' => 'Cobro', 'payment' => 'Pago', 'allocation' => 'Aplicación'][$event['type']] }}</span></td>
+                                            <td><span class="os-badge {{ $event['type'] === 'payment' ? 'os-good' : ($event['type'] === 'charge' ? 'os-warn' : '') }}">{{ ['charge' => 'Cobro', 'payment' => 'Pago', 'allocation' => 'Aplicación', 'historical_adjustment' => 'Ajuste histórico'][$event['type']] }}</span></td>
                                             <td class="os-money">{{ Number::currency($event['amount'], 'CLP', locale: 'es_CL') }}</td>
                                             <td class="os-money">{{ Number::currency($event['balance_impact'], 'CLP', locale: 'es_CL') }}</td>
                                         </tr>
@@ -83,10 +83,10 @@
                         <div class="os-footer">Mostrando {{ $timeline->count() }} de {{ $statement['timeline']->count() }} movimientos · Hasta 20 movimientos recientes del período.</div>
                     </section>
                     <section class="os-panel">
-                        <div class="os-section-head"><div><h2>Comparación mes a mes</h2><p>Últimos tres meses · Independiente del filtro de movimientos</p></div></div>
+                        <div class="os-section-head"><div><h2>Comparación mes a mes</h2><p>Últimos tres meses · Independiente del filtro de movimientos. La diferencia monetaria no incluye ajustes ni representa el saldo actual.</p></div></div>
                         <div class="os-tablewrap">
                             <table class="os-table">
-                                <thead><tr><th>Mes</th><th>Cobros</th><th>Recaudaciones</th><th>Balance</th><th>Tendencia</th></tr></thead>
+                                <thead><tr><th>Mes</th><th>Cobros</th><th>Recaudaciones</th><th>Diferencia monetaria</th><th>Tendencia</th></tr></thead>
                                 <tbody>
                                     @foreach ($monthComparison as $month)
                                         <tr><td>{{ $month['month'] }}</td><td>{{ Number::currency($month['charges'], 'CLP', locale: 'es_CL') }}</td><td>{{ Number::currency($month['collections'], 'CLP', locale: 'es_CL') }}</td><td>{{ Number::currency($month['balance'], 'CLP', locale: 'es_CL') }}</td><td>{{ ['up' => 'En aumento', 'down' => 'En descenso', 'neutral' => 'Sin variación'][$month['trend']] }}</td></tr>
@@ -100,11 +100,11 @@
                     <section class="os-panel">
                         <div class="os-section-head"><div><h2>¿Cómo se calcula mi saldo?</h2><p>Resumen acumulado de tu cuenta hasta hoy</p></div></div>
                         <div class="os-summary">
-                            @foreach (['cobrado' => 'Total de cobros registrados', 'pagado' => 'Total pagado', 'aplicado' => 'Pagos aplicados a cobros', 'disponible' => 'Saldo a favor disponible', 'balance' => 'Balance neto'] as $key => $label)
+                            @foreach (['cobrado' => 'Total de cobros registrados', 'pagado' => 'Recaudaciones registradas', 'aplicado' => 'Pagado con recaudaciones', 'ajustado' => 'Aplicado como ajuste no monetario', 'disponible' => 'Saldo a favor disponible', 'balance' => 'Balance neto'] as $key => $label)
                                 <div class="os-sumline"><span>{{ $label }}</span><strong>{{ Number::currency($resumen[$key], 'CLP', locale: 'es_CL') }}</strong></div>
                             @endforeach
                             <div class="os-sumline os-final"><span>Saldo pendiente actual</span><strong>{{ Number::currency($resumen['pendiente'], 'CLP', locale: 'es_CL') }}</strong></div>
-                            <p class="os-note">Los pagos registrados pueden diferir de los pagos aplicados. Este resumen es acumulado; el filtro de fechas solo afecta a «Pagado en el período» y a la tabla de movimientos.</p>
+                            <p class="os-note">Las recaudaciones registradas pueden diferir de las aplicadas. Los ajustes no monetarios no son pagos ni ingresos de caja. Este resumen es acumulado; el filtro de fechas solo afecta a «Pagado en el período» y a la tabla de movimientos.</p>
                         </div>
                     </section>
                     @if ($overdue->isNotEmpty())

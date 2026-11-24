@@ -43,12 +43,13 @@ class ImportHistory extends Page implements HasTable
     {
         abort_unless(static::canAccess(), 403);
 
-        return $table->query(DataImport::query()->with(['user', 'communitySetting', 'etapa'])->where('community_setting_id', CommunitySetting::current()->id))
+        return $table->query(DataImport::query()->with(['user', 'communitySetting', 'etapa'])->where('community_setting_id', CommunitySetting::current()->id)
+            ->when(! ImportFinancial::canAccess(), fn ($query) => $query->where('type', '!=', 'financial')))
             ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('id')->label('ID')->sortable(),
                 TextColumn::make('type')->label('Tipo')->formatStateUsing(fn (string $state): string => match ($state) {
-                    'owners' => 'Propietarios', 'shares' => 'Acciones', default => 'Lotes',
+                    'owners' => 'Propietarios', 'shares' => 'Acciones', 'financial' => 'Financiera', default => 'Lotes',
                 })->sortable(),
                 TextColumn::make('original_name')->label('Archivo')->searchable()->wrap(),
                 TextColumn::make('communitySetting.community_name')->label('Comunidad')->toggleable(),
@@ -64,18 +65,27 @@ class ImportHistory extends Page implements HasTable
                 TextColumn::make('error_count')->label('Errores')->toggleable(),
             ])
             ->filters([
-                SelectFilter::make('type')->label('Tipo')->options(['owners' => 'Propietarios', 'lots' => 'Lotes', 'shares' => 'Acciones']),
+                SelectFilter::make('type')->label('Tipo')->options(['owners' => 'Propietarios', 'lots' => 'Lotes', 'shares' => 'Acciones'] + (ImportFinancial::canAccess() ? ['financial' => 'Financiera'] : [])),
                 SelectFilter::make('status')->label('Estado')->options(collect(['uploaded', 'preview', 'completed', 'completed_with_errors'])->mapWithKeys(fn (string $state): array => [$state => self::statusLabel($state)])->all()),
             ])
             ->recordActions([
                 Action::make('resume')->label('Abrir asistente')
                     ->visible(fn (DataImport $record): bool => $record->user_id === auth()->id())
                     ->url(fn (DataImport $record): string => (match ($record->type) {
-                        'owners' => ImportOwners::class, 'shares' => ImportShares::class, default => ImportLots::class,
+                        'owners' => ImportOwners::class, 'shares' => ImportShares::class, 'financial' => ImportFinancial::class, default => ImportLots::class,
                     })::getUrl(['import' => $record->id])),
                 Action::make('detail')->label('Detalle')->action(fn (DataImport $record) => $this->showDetails($record->id)),
-                Action::make('report')->label('Reporte')->action(fn (DataImport $record) => app(ImportFileDownloads::class)->report($record, auth()->user())),
-                Action::make('original')->label('Archivo original')->action(fn (DataImport $record) => app(ImportFileDownloads::class)->original($record, auth()->user())),
+                Action::make('report')->label('Reporte')->visible(fn (DataImport $record): bool => $record->type !== 'financial')
+                    ->action(function (DataImport $record) {
+                        abort_if($record->type === 'financial', 403);
+
+                        return app(ImportFileDownloads::class)->report($record, auth()->user());
+                    }),
+                Action::make('original')->label('Archivo original')->action(function (DataImport $record) {
+                    abort_unless($record->type !== 'financial' || ImportFinancial::canAccess(), 403);
+
+                    return app(ImportFileDownloads::class)->original($record, auth()->user());
+                }),
             ]);
     }
 
@@ -91,6 +101,7 @@ class ImportHistory extends Page implements HasTable
     public function showDetails(int $id): void
     {
         $import = DataImport::query()->findOrFail($id);
+        abort_unless($import->type !== 'financial' || ImportFinancial::canAccess(), 403);
         app(AdministrativeImportService::class)->authorize(auth()->user(), $import);
         $this->selectedImportId = $import->id;
     }
@@ -100,6 +111,7 @@ class ImportHistory extends Page implements HasTable
         abort_unless(static::canAccess(), 403);
         $selected = $this->selectedImportId ? DataImport::query()->findOrFail($this->selectedImportId) : null;
         if ($selected) {
+            abort_unless($selected->type !== 'financial' || ImportFinancial::canAccess(), 403);
             app(AdministrativeImportService::class)->authorize(auth()->user(), $selected);
         }
 

@@ -5,11 +5,15 @@ namespace App\Domain\Accounting\Services;
 use App\Domain\Accounting\Enums\AccountingPeriodStatus;
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Domain\Collections\Enums\CollectionStatus;
+use App\Domain\Imports\Enums\HistoricalAdjustmentCategory;
 use App\Models\AccountingPeriod;
 use App\Models\AccountingPeriodSnapshot;
 use App\Models\Collection;
 use App\Models\CollectionAllocation;
+use App\Models\HistoricalAdjustment;
+use App\Models\HistoricalAdjustmentAllocation;
 use App\Models\PartnerCharge;
+use App\Models\Propietario;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Carbon;
@@ -295,6 +299,10 @@ class MonthlyClosingService
         $creditBalance = (float) Collection::query()
             ->whereIn('status', [CollectionStatus::PendingApplication->value, CollectionStatus::PartiallyApplied->value])
             ->sum('unapplied_amount');
+        $creditBalance += (float) HistoricalAdjustment::query()->where('category', 'credit_opening')->sum('amount');
+        $creditBalance -= (float) HistoricalAdjustmentAllocation::query()
+            ->whereHas('adjustment', fn ($query) => $query->where('category', 'credit_opening'))
+            ->sum('amount');
 
         $aging = $this->calculateAgingBuckets($end);
 
@@ -431,6 +439,42 @@ class MonthlyClosingService
             ]);
         }
 
+        $adjustments = HistoricalAdjustment::query()
+            ->where(function ($query) use ($period, $start, $end): void {
+                $query->where(function ($query) use ($start, $end): void {
+                    $query->where('date_precision', 'day')
+                        ->whereBetween('effective_date', [$start->toDateString(), $end->toDateString()]);
+                })->orWhere(function ($query) use ($period): void {
+                    $query->where('date_precision', 'month')
+                        ->where('effective_year', $period->year)
+                        ->where('effective_month', $period->month);
+                });
+            })
+            ->get();
+        $owners = Propietario::query()->whereIn('id', $adjustments->pluck('propietario_id')->unique())->get()->keyBy('id');
+
+        foreach ($adjustments as $adjustment) {
+            $pending = $adjustment->category === HistoricalAdjustmentCategory::UnexplainedDifference;
+            $type = match ($adjustment->category) {
+                HistoricalAdjustmentCategory::CreditOpening => 'Apertura acreedora no monetaria',
+                HistoricalAdjustmentCategory::DebtCorrection => 'Corrección de deuda no monetaria',
+                HistoricalAdjustmentCategory::DebtForgiveness => 'Condonación no monetaria',
+                HistoricalAdjustmentCategory::UnexplainedDifference => 'Diferencia pendiente de verificación',
+            };
+            $rows->push([
+                'movement_type' => $type,
+                'movement_date' => $adjustment->date_precision === 'day'
+                    ? $adjustment->effective_date->format('Y-m-d')
+                    : sprintf('%04d-%02d', $adjustment->effective_year, $adjustment->effective_month),
+                'owner_name' => $owners->get($adjustment->propietario_id)?->nombre_completo ?? '-',
+                'reference' => 'Ajuste #'.$adjustment->id.($pending ? ' - monto informativo: '.$adjustment->amount : ''),
+                'debit' => 0.0,
+                'credit' => $pending ? 0.0 : round((float) $adjustment->amount, 2),
+                'status' => $adjustment->evidence_status,
+                'sort_key' => $adjustment->effective_date?->timestamp ?? $start->timestamp,
+            ]);
+        }
+
         $sorted = $rows
             ->sortBy([
                 ['sort_key', 'asc'],
@@ -468,19 +512,12 @@ class MonthlyClosingService
         });
     }
 
-    private function chargeImputationDate(PartnerCharge $charge, AccountingPeriod $period): Carbon
+    public function chargeImputationDate(PartnerCharge $charge, ?AccountingPeriod $period = null): Carbon
     {
         if ($charge->imputation_date !== null) {
             return $charge->imputation_date->copy()->startOfDay();
         }
-        $due = $charge->expense?->due_date;
-        if ($due === null) {
-            return $charge->created_at->copy();
-        }
-        if ($due->format('Y-m') === $period->period_end->format('Y-m') && $charge->created_at->gt($period->period_end->copy()->endOfDay())) {
-            return $period->period_end->copy()->startOfDay();
-        }
 
-        return $due->copy()->startOfDay();
+        return $charge->expense?->due_date?->copy()->startOfDay() ?? $charge->created_at->copy();
     }
 }

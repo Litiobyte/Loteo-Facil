@@ -22,7 +22,7 @@ class OwnersOnTimeStatWidget extends StatsOverviewWidget
 
         return [
             Stat::make('Propietarios al dia', number_format($metrics['owners_on_time_count'], 0, ',', '.'))
-                ->description(sprintf('Propietarios activos con cobros pagados (%d activos)', $metrics['active_owners_count']))
+                ->description(sprintf('Propietarios activos con cobros saldados mediante recaudaciones o ajustes (%d activos)', $metrics['active_owners_count']))
                 ->icon('heroicon-o-check-circle')
                 ->color('success'),
         ];

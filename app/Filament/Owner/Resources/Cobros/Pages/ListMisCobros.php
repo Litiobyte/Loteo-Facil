@@ -5,6 +5,7 @@ namespace App\Filament\Owner\Resources\Cobros\Pages;
 use App\Domain\Balances\Services\PartnerBalanceService;
 use App\Domain\Charges\Enums\ChargeStatus;
 use App\Filament\Owner\Resources\Cobros\MisCobrosResource;
+use App\Support\ChargeSettlementPresentation;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Support\Enums\Width;
@@ -56,12 +57,14 @@ class ListMisCobros extends ListRecords
     {
         $query = MisCobrosResource::getEloquentQuery();
         $owner = Auth::user()?->propietario;
+        $summary = $owner ? app(PartnerBalanceService::class)->getBalanceSummary($owner) : [];
 
         return [
             'pendingBalance' => $owner ? app(PartnerBalanceService::class)->getPendingBalance($owner) : 0,
             'pendingCount' => (clone $query)->unpaid()->where('remaining_amount', '>', 0)->count(),
             'issuedTotal' => (clone $query)->sum('amount'),
-            'paidTotal' => (clone $query)->sum('paid_amount'),
+            'paidTotal' => $summary['total_applied'] ?? 0,
+            'nonMonetaryTotal' => $summary['total_non_monetary_applied'] ?? 0,
             'chargeCount' => (clone $query)->count(),
             'hasConsolidated' => (clone $query)->where('status', ChargeStatus::Consolidated)->exists(),
         ];
@@ -76,7 +79,7 @@ class ListMisCobros extends ListRecords
         return response()->streamDownload(function () use ($query): void {
             $output = fopen('php://output', 'w');
             fwrite($output, "\xEF\xBB\xBF");
-            fputcsv($output, ['ID', 'Concepto', 'Categoría', 'Vencimiento', 'Monto emitido', 'Pago aplicado', 'Saldo pendiente', 'Estado'], ';', '"', '');
+            fputcsv($output, ['ID', 'Concepto', 'Categoría', 'Vencimiento', 'Monto emitido', 'Total aplicado (pagos y ajustes)', 'Pagado con recaudaciones', 'Aplicado como ajuste no monetario', 'Saldo pendiente', 'Estado'], ';', '"', '');
 
             foreach ($query->lazy(200) as $charge) {
                 $row = [
@@ -86,8 +89,10 @@ class ListMisCobros extends ListRecords
                     $charge->due_date?->format('Y-m-d') ?? '',
                     $charge->amount,
                     $charge->paid_amount,
+                    $charge->collection_applied_amount,
+                    $charge->non_monetary_applied_amount,
                     $charge->status === ChargeStatus::Consolidated ? 0 : $charge->remaining_amount,
-                    MisCobrosResource::statusLabel($charge->status),
+                    ChargeSettlementPresentation::statusLabel($charge),
                 ];
                 $row = array_map(
                     fn (mixed $value): mixed => is_string($value) && preg_match('/^[\s]*[=+\-@]/u', $value) ? "'".$value : $value,

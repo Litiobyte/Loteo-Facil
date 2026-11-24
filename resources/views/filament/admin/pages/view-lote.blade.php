@@ -1,4 +1,7 @@
 <x-filament-panels::page>
+    <x-filament::section heading="Documentos del lote">
+        @livewire('document-manager', ['entity' => $this->getRecord(), 'moduleKey' => 'lotes'], key('lot-documents-'.$this->getRecord()->getKey()))
+    </x-filament::section>
     <div class="lote-detail-columns">
 
         {{-- Resumen: ancho completo --}}

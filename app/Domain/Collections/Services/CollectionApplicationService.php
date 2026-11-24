@@ -8,6 +8,7 @@ use App\Models\Collection;
 use App\Models\CollectionAllocation;
 use App\Models\PartnerCharge;
 use DomainException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 
@@ -20,9 +21,9 @@ class CollectionApplicationService
      *
      * @throws DomainException
      */
-    public function applyCollectionAutomatically(Collection $payment): SupportCollection
+    public function applyCollectionAutomatically(Collection $payment, ?Carbon $allocatedAt = null, ?int $createdBy = null): SupportCollection
     {
-        return DB::transaction(function () use ($payment): SupportCollection {
+        return DB::transaction(function () use ($payment, $allocatedAt, $createdBy): SupportCollection {
             $payment = Collection::query()->lockForUpdate()->findOrFail($payment->id);
             $this->validateCollectionCanBeApplied($payment);
             $availableCharges = PartnerCharge::query()->where('propietario_id', $payment->propietario_id)
@@ -46,7 +47,7 @@ class CollectionApplicationService
                     continue;
                 }
 
-                $allocation = $this->createAllocation($payment, $charge, $allocationAmount);
+                $allocation = $this->createAllocation($payment, $charge, $allocationAmount, $allocatedAt, $createdBy);
                 $this->updateChargeFromAllocation($charge, $allocationAmount);
 
                 $allocations->push($allocation);
@@ -67,7 +68,7 @@ class CollectionApplicationService
      *
      * @throws DomainException
      */
-    public function applyCollectionManually(Collection $payment, array $chargeAllocations): SupportCollection
+    public function applyCollectionManually(Collection $payment, array $chargeAllocations, ?Carbon $allocatedAt = null, ?int $createdBy = null): SupportCollection
     {
         $this->validateCollectionCanBeApplied($payment);
 
@@ -77,7 +78,7 @@ class CollectionApplicationService
 
         $this->validateManualAllocations($payment, $chargeAllocations);
 
-        return DB::transaction(function () use ($payment, $chargeAllocations): SupportCollection {
+        return DB::transaction(function () use ($payment, $chargeAllocations, $allocatedAt, $createdBy): SupportCollection {
             $payment = Collection::query()->lockForUpdate()->findOrFail($payment->id);
             $this->validateCollectionCanBeApplied($payment);
             $this->validateManualAllocations($payment, $chargeAllocations);
@@ -99,7 +100,7 @@ class CollectionApplicationService
                     throw new DomainException("El monto para el cobro #{$charge->id} excede su saldo pendiente.");
                 }
 
-                $allocation = $this->createAllocation($payment, $charge, $amount);
+                $allocation = $this->createAllocation($payment, $charge, $amount, $allocatedAt, $createdBy);
                 $this->updateChargeFromAllocation($charge, $amount);
 
                 $allocations->push($allocation);
@@ -272,14 +273,14 @@ class CollectionApplicationService
     /**
      * Create a payment allocation record.
      */
-    private function createAllocation(Collection $payment, PartnerCharge $charge, float $amount): CollectionAllocation
+    private function createAllocation(Collection $payment, PartnerCharge $charge, float $amount, ?Carbon $allocatedAt, ?int $createdBy): CollectionAllocation
     {
         return CollectionAllocation::create([
             'collection_id' => $payment->id,
             'partner_charge_id' => $charge->id,
             'amount' => round($amount, 2),
-            'allocated_at' => now(),
-            'created_by' => auth()->id(),
+            'allocated_at' => $allocatedAt ?? now(),
+            'created_by' => $createdBy ?? auth()->id(),
         ]);
     }
 

@@ -34,6 +34,10 @@ class OwnerPanelProvider extends PanelProvider
             ->login(Login::class)
             ->profile(ChangePassword::class, isSimple: false)
             ->renderHook(
+                PanelsRenderHook::USER_MENU_BEFORE,
+                fn (): string => view('filament.owner.profile-alert-badge')->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
                 fn (): string => view('filament.auth.switch-login-link', [
                     'label' => 'Eres administrador?',

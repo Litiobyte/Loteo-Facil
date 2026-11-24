@@ -16,7 +16,8 @@
             @foreach ([
                 ['Saldo pendiente', $pendingBalance, $pendingCount.' cobros con saldo por pagar', 'heroicon-o-exclamation-circle'],
                 ['Total emitido', $issuedTotal, 'Incluye cobros consolidados del historial', 'heroicon-o-document-text'],
-                ['Pagos aplicados', $paidTotal, 'Aplicados a los cobros registrados', 'heroicon-o-check'],
+                ['Pagado con recaudaciones', $paidTotal, 'Recaudaciones aplicadas a cobros · sin ajustes', 'heroicon-o-check'],
+                ['Aplicado como ajuste no monetario', $nonMonetaryTotal, 'No representa dinero recibido ni ingreso de caja', 'heroicon-o-document-check'],
             ] as [$label, $value, $hint, $icon])
                 <article class="oc-metric {{ $loop->first ? 'oc-warning' : '' }}">
                     <div class="oc-metric-top"><span>{{ $label }}</span><span class="oc-symbol"><x-filament::icon :icon="$icon" /></span></div>

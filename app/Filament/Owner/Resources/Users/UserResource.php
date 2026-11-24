@@ -44,7 +44,7 @@ class UserResource extends Resource
                 TextColumn::make('name')
                     ->label('Nombre'),
                 TextColumn::make('email')
-                    ->label('Email'),
+                    ->label('Correo electrónico'),
                 TextColumn::make('roles.name')
                     ->label('Rol')
                     ->badge(),
@@ -63,6 +63,31 @@ class UserResource extends Resource
         return parent::getEloquentQuery()
             ->with('roles')
             ->whereKey(Auth::id());
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return static::ownerProfileIncomplete() ? '!' : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'warning';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return static::ownerProfileIncomplete() ? 'Completa tu información' : null;
+    }
+
+    protected static function ownerProfileIncomplete(): bool
+    {
+        $user = Auth::user();
+
+        return $user !== null
+            && $user->hasRole('propietario')
+            && $user->propietario !== null
+            && ! $user->propietario->isProfileComplete();
     }
 
     public static function getPages(): array

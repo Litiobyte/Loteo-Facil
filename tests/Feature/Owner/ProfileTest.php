@@ -9,6 +9,8 @@ use App\Models\Propietario;
 use App\Models\Region;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
@@ -19,6 +21,13 @@ use Tests\TestCase;
 class ProfileTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_profile_table_uses_a_spanish_email_label(): void
+    {
+        $table = UserResource::table(Table::make($this->createMock(HasTable::class)));
+
+        $this->assertSame('Correo electrónico', $table->getColumn('email')->getLabel());
+    }
 
     protected function setUp(): void
     {
@@ -171,6 +180,50 @@ class ProfileTest extends TestCase
         $this->get(UserResource::getUrl())->assertRedirect();
         $this->actingAs(User::factory()->create())->get(UserResource::getUrl())->assertForbidden();
         Livewire::test(ManageUsers::class)->assertForbidden();
+    }
+
+    public function test_incomplete_profile_shows_warning_badge_in_navigation(): void
+    {
+        [$user, $owner] = $this->createOwner();
+        $this->actingAs($user);
+
+        $this->assertFalse($owner->isProfileComplete());
+        $this->assertSame('!', UserResource::getNavigationBadge());
+        $this->assertSame('warning', UserResource::getNavigationBadgeColor());
+        $this->assertSame('Completa tu información', UserResource::getNavigationBadgeTooltip());
+
+        $view = view('filament.owner.profile-alert-badge')->render();
+        $this->assertStringContainsString("badge.textContent = '!'", $view);
+        $this->assertStringNotContainsString('badge.remove();', $view);
+    }
+
+    public function test_complete_profile_hides_navigation_and_avatar_badges(): void
+    {
+        [$user, $owner] = $this->createOwner();
+        $region = Region::query()->create(['nombre' => 'Región de prueba']);
+        $commune = Comuna::query()->create(['nombre' => 'Comuna de prueba', 'region_id' => $region->id]);
+        $owner->update(['telefono' => '+56 9 1234 5678', 'direccion' => 'Calle Falsa 123', 'region_id' => $region->id, 'comuna_id' => $commune->id]);
+        $this->actingAs($user);
+
+        $this->assertTrue($owner->isProfileComplete());
+        $this->assertNull(UserResource::getNavigationBadge());
+        $this->assertNull(UserResource::getNavigationBadgeTooltip());
+
+        $view = view('filament.owner.profile-alert-badge')->render();
+        $this->assertStringContainsString('badge.remove();', $view);
+        $this->assertStringNotContainsString("badge.textContent = '!'", $view);
+    }
+
+    public function test_missing_owner_relation_never_shows_profile_badges(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('propietario');
+        $this->actingAs($user);
+
+        $this->assertNull(UserResource::getNavigationBadge());
+
+        $view = view('filament.owner.profile-alert-badge')->render();
+        $this->assertStringContainsString('badge.remove();', $view);
     }
 
     /** @return array{User, Propietario} */

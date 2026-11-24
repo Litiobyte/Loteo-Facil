@@ -47,7 +47,8 @@ class MisCobrosResourceTest extends TestCase
             ->assertViewHas('pendingBalance', 10000.0)
             ->assertViewHas('pendingCount', 1)
             ->assertViewHas('issuedTotal', fn ($value): bool => (float) $value === 22000.0)
-            ->assertViewHas('paidTotal', fn ($value): bool => (float) $value === 7000.0)
+            ->assertViewHas('paidTotal', fn ($value): bool => (float) $value === 0.0)
+            ->assertViewHas('nonMonetaryTotal', 0)
             ->assertViewHas('chargeCount', 3)
             ->assertCanSeeTableRecords([$pending, $consolidated, $paid])
             ->set('activeTab', 'pending')
@@ -177,7 +178,7 @@ class MisCobrosResourceTest extends TestCase
     {
         $this->assertSame('Pendiente', MisCobrosResource::statusLabel(ChargeStatus::Pending));
         $this->assertSame('Parcial', MisCobrosResource::statusLabel(ChargeStatus::Partial));
-        $this->assertSame('Pagado', MisCobrosResource::statusLabel(ChargeStatus::Paid));
+        $this->assertSame('Saldado (pagos o ajustes)', MisCobrosResource::statusLabel(ChargeStatus::Paid));
         $this->assertSame('Cancelado', MisCobrosResource::statusLabel(ChargeStatus::Cancelled));
     }
 

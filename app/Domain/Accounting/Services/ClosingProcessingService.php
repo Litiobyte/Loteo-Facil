@@ -25,7 +25,7 @@ class ClosingProcessingService
             'excluded_not_overdue' => Expense::query()->registered()->whereDate('due_date', '>=', $cutoff)->orderBy('id')->get(['id', 'due_date'])->map(fn (Expense $expense): array => ['id' => $expense->id, 'due_date' => $expense->due_date->toDateString()])->all(),
             'imputation_policy' => 'due_date_or_period_end',
         ];
-        $expenses = Expense::query()->registered()->whereNotNull('due_date')
+        $expenses = Expense::query()->registered()->where('historical_distribution_blocked', false)->whereNotNull('due_date')
             ->whereDate('due_date', '<', $cutoff)->orderBy('id')->lockForUpdate()->get();
         foreach ($expenses as $expense) {
             try {

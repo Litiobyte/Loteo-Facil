@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Accounting\Services\MonthlyClosingService;
 use App\Domain\Collections\Enums\CollectionMethod;
 use App\Domain\Collections\Enums\CollectionStatus;
+use App\Domain\Imports\Enums\HistoricalEvidenceState;
 use Database\Factories\CollectionFactory;
 use DomainException;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -33,6 +34,7 @@ class Collection extends Model
         'collection_method',
         'reference',
         'notes',
+        'evidence_status',
         'status',
         'created_by',
     ];
@@ -56,6 +58,7 @@ class Collection extends Model
             'collection_date' => 'date',
             'collection_method' => CollectionMethod::class,
             'status' => CollectionStatus::class,
+            'evidence_status' => HistoricalEvidenceState::class,
         ];
     }
 

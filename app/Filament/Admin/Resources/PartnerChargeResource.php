@@ -10,6 +10,7 @@ use App\Filament\Admin\Resources\PartnerChargeResource\Pages\ViewPartnerCharge;
 use App\Filament\Resources\Propietarios\PropietarioResource;
 use App\Models\PartnerCharge;
 use App\Support\AdminTableColumns;
+use App\Support\ChargeSettlementPresentation;
 use App\Support\ChileanNumber;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -77,7 +78,13 @@ class PartnerChargeResource extends Resource
                             ->label('Monto del cobro')
                             ->money('CLP', locale: 'es_CL'),
                         TextEntry::make('paid_amount')
-                            ->label('Monto pagado')
+                            ->label('Total aplicado (pagos y ajustes)')
+                            ->money('CLP', locale: 'es_CL'),
+                        TextEntry::make('collection_applied_amount')
+                            ->label('Pagado con recaudaciones')
+                            ->money('CLP', locale: 'es_CL'),
+                        TextEntry::make('non_monetary_applied_amount')
+                            ->label('Aplicado como ajuste no monetario')
                             ->money('CLP', locale: 'es_CL'),
                         TextEntry::make('remaining_amount')
                             ->state(fn (PartnerCharge $record): string => $record->status === ChargeStatus::Consolidated ? '0' : $record->remaining_amount)
@@ -86,7 +93,7 @@ class PartnerChargeResource extends Resource
                         TextEntry::make('status')
                             ->label('Estado')
                             ->badge()
-                            ->formatStateUsing(fn (ChargeStatus|string|null $state): string => static::getStatusLabel($state))
+                            ->formatStateUsing(fn (PartnerCharge $record): string => ChargeSettlementPresentation::statusLabel($record))
                             ->color(fn (ChargeStatus|string|null $state): string => static::getStatusColor($state)),
                         TextEntry::make('due_date')
                             ->label('Fecha de vencimiento')
@@ -183,13 +190,22 @@ class PartnerChargeResource extends Resource
                             ->money('CLP', locale: 'es_CL'),
                     ),
                 TextColumn::make('paid_amount')
-                    ->label('Monto pagado')
+                    ->label('Total aplicado (pagos y ajustes)')
                     ->money('CLP', locale: 'es_CL')
                     ->sortable()
                     ->summarize(
                         Sum::make()
                             ->money('CLP', locale: 'es_CL'),
                     ),
+                TextColumn::make('collection_applied_amount')
+                    ->label('Pagado con recaudaciones')
+                    ->money('CLP', locale: 'es_CL')
+                    ->sortable(),
+                TextColumn::make('non_monetary_applied_amount')
+                    ->label('Aplicado como ajuste no monetario')
+                    ->money('CLP', locale: 'es_CL')
+                    ->color(fn (mixed $state): string => (float) $state > 0 ? 'info' : 'gray')
+                    ->sortable(),
                 TextColumn::make('remaining_amount')
                     ->state(fn (PartnerCharge $record): string => $record->status === ChargeStatus::Consolidated ? '0' : $record->remaining_amount)
                     ->label('Saldo pendiente')
@@ -203,7 +219,7 @@ class PartnerChargeResource extends Resource
                 TextColumn::make('status')
                     ->label('Estado')
                     ->badge()
-                    ->formatStateUsing(fn (ChargeStatus|string|null $state): string => static::getStatusLabel($state))
+                    ->formatStateUsing(fn (PartnerCharge $record): string => ChargeSettlementPresentation::statusLabel($record))
                     ->color(fn (ChargeStatus|string|null $state): string => static::getStatusColor($state)),
                 TextColumn::make('calculation_type')
                     ->label('Tipo de cálculo')
@@ -230,7 +246,7 @@ class PartnerChargeResource extends Resource
                     ->options([
                         ChargeStatus::Pending->value => 'Pendiente',
                         ChargeStatus::Partial->value => 'Parcial',
-                        ChargeStatus::Paid->value => 'Pagado',
+                        ChargeStatus::Paid->value => 'Saldado (pagos o ajustes)',
                         ChargeStatus::Consolidated->value => 'Consolidado',
                         'unpaid' => 'Impagos',
                     ])
@@ -362,6 +378,11 @@ class PartnerChargeResource extends Resource
         return auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false;
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return ChargeSettlementPresentation::withAmounts(parent::getEloquentQuery());
+    }
+
     public static function canViewAny(): bool
     {
         return static::canAccess();
@@ -402,7 +423,7 @@ class PartnerChargeResource extends Resource
         return match ($status) {
             ChargeStatus::Pending => 'Pendiente',
             ChargeStatus::Partial => 'Parcial',
-            ChargeStatus::Paid => 'Pagado',
+            ChargeStatus::Paid => 'Saldado (pagos o ajustes)',
             ChargeStatus::Cancelled => 'Cancelado',
             ChargeStatus::Consolidated => 'Consolidado',
         };
@@ -474,7 +495,9 @@ class PartnerChargeResource extends Resource
                 'Propietario',
                 'Gasto',
                 'Monto',
-                'Monto pagado',
+                'Total aplicado (pagos y ajustes)',
+                'Pagado con recaudaciones',
+                'Aplicado como ajuste no monetario',
                 'Saldo pendiente',
                 'Estado',
                 'Tipo de cálculo',
@@ -494,8 +517,10 @@ class PartnerChargeResource extends Resource
                     $record->expense?->title,
                     (float) $record->amount,
                     (float) $record->paid_amount,
+                    (float) $record->collection_applied_amount,
+                    (float) $record->non_monetary_applied_amount,
                     (float) $record->remaining_amount,
-                    static::getStatusLabel($record->status),
+                    ChargeSettlementPresentation::statusLabel($record),
                     static::getCalculationTypeLabel($record->calculation_type),
                     $record->percentage_applied,
                     $record->due_date?->format('Y-m-d'),

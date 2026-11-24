@@ -7,6 +7,7 @@ use App\Domain\Expenses\Enums\ExpenseDistributionType;
 use App\Filament\Owner\Resources\Cobros\Pages\ListMisCobros;
 use App\Filament\Owner\Resources\Cobros\Pages\ViewCobro;
 use App\Models\PartnerCharge;
+use App\Support\ChargeSettlementPresentation;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
@@ -111,10 +112,18 @@ class MisCobrosResource extends Resource
                     ->sortable()
                     ->summarize(Sum::make()->money('CLP', locale: 'es_CL')),
                 TextColumn::make('paid_amount')
-                    ->label('Pagado')
+                    ->label('Total aplicado (pagos y ajustes)')
                     ->money('CLP', locale: 'es_CL')
                     ->sortable()
                     ->summarize(Sum::make()->money('CLP', locale: 'es_CL')),
+                TextColumn::make('collection_applied_amount')
+                    ->label('Pagado con recaudaciones')
+                    ->money('CLP', locale: 'es_CL')
+                    ->sortable(),
+                TextColumn::make('non_monetary_applied_amount')
+                    ->label('Aplicado como ajuste no monetario')
+                    ->money('CLP', locale: 'es_CL')
+                    ->sortable(),
                 TextColumn::make('remaining_amount')
                     ->state(fn (PartnerCharge $record): string => $record->status === ChargeStatus::Consolidated ? '0' : $record->remaining_amount)
                     ->label('Pendiente')
@@ -142,7 +151,7 @@ class MisCobrosResource extends Resource
                 TextColumn::make('status')
                     ->label('Estado')
                     ->badge()
-                    ->formatStateUsing(fn (ChargeStatus|string $state): string => static::statusLabel($state))
+                    ->formatStateUsing(fn (PartnerCharge $record): string => ChargeSettlementPresentation::statusLabel($record))
                     ->color(fn (ChargeStatus|string $state): string => static::statusColor($state)),
                 TextColumn::make('calculation_type')
                     ->label('Tipo Cálculo')
@@ -156,7 +165,7 @@ class MisCobrosResource extends Resource
                     ->options([
                         ChargeStatus::Pending->value => 'Pendiente',
                         ChargeStatus::Partial->value => 'Parcial',
-                        ChargeStatus::Paid->value => 'Pagado',
+                        ChargeStatus::Paid->value => 'Saldado (pagos o ajustes)',
                         ChargeStatus::Cancelled->value => 'Cancelado',
                         ChargeStatus::Consolidated->value => 'Consolidado',
                     ]),
@@ -211,10 +220,10 @@ class MisCobrosResource extends Resource
         $propietarioId = Auth::user()?->propietario?->id;
 
         if (! $propietarioId) {
-            return parent::getEloquentQuery()->whereRaw('1 = 0');
+            return ChargeSettlementPresentation::withAmounts(parent::getEloquentQuery())->whereRaw('1 = 0');
         }
 
-        return parent::getEloquentQuery()->where('propietario_id', $propietarioId);
+        return ChargeSettlementPresentation::withAmounts(parent::getEloquentQuery())->where('propietario_id', $propietarioId);
     }
 
     public static function canCreate(): bool
@@ -258,7 +267,7 @@ class MisCobrosResource extends Resource
         return match ($status) {
             ChargeStatus::Pending => 'Pendiente',
             ChargeStatus::Partial => 'Parcial',
-            ChargeStatus::Paid => 'Pagado',
+            ChargeStatus::Paid => 'Saldado (pagos o ajustes)',
             ChargeStatus::Cancelled => 'Cancelado',
             ChargeStatus::Consolidated => 'Consolidado',
         };
