@@ -28,11 +28,12 @@ class CommunityLogoTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Storage::fake('public');
+        Storage::fake('documents');
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('propietario', 'web');
         $this->admin = User::factory()->create();
         $this->admin->assignRole('admin');
+        $this->actingAs($this->admin);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
@@ -56,9 +57,9 @@ class CommunityLogoTest extends TestCase
     {
         $settings = $this->upload();
         $path = $settings->logo_path;
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('documents')->assertExists($path);
         $this->assertMatchesRegularExpression('/^community-logos\/[a-zA-Z0-9]{40}\.png$/', $path);
-        $this->assertSame(Storage::disk('public')->url($path), CommunitySetting::logoUrl());
+        $this->assertSame(route('community.logo'), CommunitySetting::logoUrl());
 
         app(CommunitySettingsService::class)->update($this->settings(), 'Sin cambiar marca', $this->admin);
         $this->assertSame($path, CommunitySetting::current()->logo_path);
@@ -82,7 +83,7 @@ class CommunityLogoTest extends TestCase
             ->call('save')->assertHasNoErrors();
         $path = CommunitySetting::current()->logo_path;
         $this->assertNotNull($path);
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('documents')->assertExists($path);
         Livewire::test(EditCommunitySettings::class)
             ->fillForm(['reason' => 'Conservar marca'])
             ->call('save')->assertHasNoErrors();
@@ -93,9 +94,9 @@ class CommunityLogoTest extends TestCase
         $this->assertNull(CommunitySetting::current()->logo_path);
     }
 
-    public function test_saved_logo_preview_uses_same_origin_with_real_public_disk_configuration(): void
+    public function test_saved_logo_preview_uses_authenticated_route(): void
     {
-        Storage::fake('public', config('filesystems.disks.public'));
+        Storage::fake('documents', config('filesystems.disks.documents'));
         config(['app.url' => 'http://localhost']);
         $this->actingAs($this->admin);
 
@@ -104,7 +105,7 @@ class CommunityLogoTest extends TestCase
             ->call('save')->assertHasNoErrors();
 
         $path = CommunitySetting::current()->logo_path;
-        $disk = Storage::disk('public');
+        $disk = Storage::disk('documents');
         $this->assertFileExists($disk->path($path));
         $this->assertSame('image/png', $disk->mimeType($path));
 
@@ -116,8 +117,8 @@ class CommunityLogoTest extends TestCase
             $this->assertSame(basename($path), $files[0]['name']);
             $this->assertSame(filesize($disk->path($path)), $files[0]['size']);
             $this->assertSame('image/png', $files[0]['type']);
-            $this->assertSame('/storage/'.$path, $files[0]['url']);
-            $this->assertSame('/storage/'.$path, CommunitySetting::logoUrl());
+            $this->assertSame(route('community.logo'), $files[0]['url']);
+            $this->assertSame(route('community.logo'), CommunitySetting::logoUrl());
         }
     }
 
@@ -128,8 +129,8 @@ class CommunityLogoTest extends TestCase
                 $this->settings(['logo_path' => UploadedFile::fake()->image("logo.{$extension}")]),
                 'Formato raster', $this->admin,
             );
-            Storage::disk('public')->assertExists($settings->logo_path);
-            $this->assertSame(Storage::disk('public')->url($settings->logo_path), CommunitySetting::logoUrl());
+            Storage::disk('documents')->assertExists($settings->logo_path);
+            $this->assertSame(route('community.logo'), CommunitySetting::logoUrl());
         }
     }
 
@@ -147,7 +148,7 @@ class CommunityLogoTest extends TestCase
         } catch (QueryException) {
             $this->assertSame($path, CommunitySetting::current()->logo_path);
         }
-        $this->assertSame([$path], Storage::disk('public')->allFiles('community-logos'));
+        $this->assertSame([$path], Storage::disk('documents')->allFiles('community-logos'));
         $this->assertSame(1, DB::table('community_setting_revisions')->count());
     }
 
@@ -157,7 +158,7 @@ class CommunityLogoTest extends TestCase
         Livewire::test(EditCommunitySettings::class)
             ->fillForm(['logo_path' => UploadedFile::fake()->createWithContent('logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>'), 'reason' => 'SVG'])
             ->call('save')->assertHasFormErrors(['logo_path']);
-        Storage::disk('public')->put('private-file.png', 'secret');
+        Storage::disk('documents')->put('private-file.png', 'secret');
         Livewire::test(EditCommunitySettings::class)
             ->set('data.logo_path', ['tampered' => 'private-file.png'])
             ->fillForm(['reason' => 'Ruta ajena'])
@@ -185,20 +186,17 @@ class CommunityLogoTest extends TestCase
                 $this->assertArrayHasKey('logo_path', $exception->errors());
             }
         }
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk('documents')->allFiles());
         $this->assertSame(0, DB::table('community_setting_revisions')->count());
     }
 
     public function test_branding_and_favicons_use_logo_in_both_panels_and_logins(): void
     {
         $path = $this->upload()->logo_path;
-        $url = Storage::disk('public')->url($path);
+        $url = route('community.logo');
         foreach (['admin', 'owner'] as $panel) {
             $this->assertSame($url, Filament::getPanel($panel)->getFavicon());
             $this->assertStringContainsString($url, Filament::getPanel($panel)->getBrandLogo()->toHtml());
-        }
-        foreach (['/admin/login', '/propietario/login'] as $login) {
-            $this->get($login)->assertOk()->assertSee($url, false)->assertDontSee('branding/logo-full-transparent.png');
         }
         $this->actingAs($this->admin)->get('/admin')->assertOk()->assertSee($url, false);
         $owner = User::factory()->create(['must_change_password' => false]);
@@ -214,6 +212,7 @@ class CommunityLogoTest extends TestCase
             $this->assertSame(asset('branding/logo-full-transparent.png'), CommunitySetting::logoUrl());
             $this->assertSame(asset('branding/icon-transparent.png'), CommunitySetting::logoUrl(icon: true));
         }
+        auth()->logout();
         $this->get('/admin/login')->assertOk()->assertSee(asset('branding/logo-full-transparent.png'), false);
         $this->get('/propietario/login')->assertOk()->assertSee(asset('branding/logo-full-transparent.png'), false);
     }
@@ -232,7 +231,7 @@ class CommunityLogoTest extends TestCase
             $this->assertSame(403, $exception->getStatusCode());
         }
 
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk('documents')->allFiles());
         $this->assertSame(0, DB::table('community_setting_revisions')->count());
     }
 }

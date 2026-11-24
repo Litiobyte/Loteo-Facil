@@ -46,9 +46,7 @@ class DocumentStorageService
                 throw new \RuntimeException('No se pudo leer el archivo.');
             }
             try {
-                if (! $disk->put($path, $stream, ['visibility' => 'private'])) {
-                    throw new \RuntimeException('No se pudo guardar el archivo.');
-                }
+                app(PrivateStorageService::class)->putStream($path, $stream);
             } finally {
                 fclose($stream);
             }

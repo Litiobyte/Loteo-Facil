@@ -42,9 +42,10 @@ class CommunitySetting extends Model
             $path = null;
         }
 
-        if (is_string($path) && preg_match('/\Acommunity-logos\/[a-zA-Z0-9]{40}\.(png|jpg|jpeg|webp)\z/', $path)
-            && Storage::disk('public')->exists($path)) {
-            return Storage::disk('public')->url($path);
+        if (auth()->user()?->hasAnyRole(['admin', 'super_admin', 'propietario'])
+            && is_string($path) && preg_match('/\Acommunity-logos\/[a-zA-Z0-9]{40}\.(png|jpg|jpeg|webp)\z/', $path)
+            && Storage::disk('documents')->exists($path)) {
+            return route('community.logo');
         }
 
         return asset($icon ? 'branding/icon-transparent.png' : 'branding/logo-full-transparent.png');

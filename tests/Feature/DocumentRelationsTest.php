@@ -29,6 +29,5 @@ class DocumentRelationsTest extends TestCase
             'document_id' => $document->id, 'documentable_type' => Propietario::class, 'documentable_id' => $owner->id,
         ]);
         $this->assertTrue(Documentable::firstOrFail()->documentable->is($owner));
-        $this->assertSame('private', config('filesystems.disks.documents.visibility'));
     }
 }

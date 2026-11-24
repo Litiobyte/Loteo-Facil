@@ -8,6 +8,7 @@ use App\Domain\Owners\Services\ShareHoldingService;
 use App\Filament\Admin\Resources\ShareContributionResource;
 use App\Filament\Admin\Resources\ShareContributionResource\Pages\ListShareContributions;
 use App\Filament\Admin\Resources\ShareHoldingResource\Pages\ManageShareHoldings;
+use App\Filament\Admin\Widgets\ShareContributionsStatWidget;
 use App\Filament\Resources\Propietarios\Pages\EditPropietario;
 use App\Filament\Resources\Propietarios\RelationManagers\ShareContributionsRelationManager;
 use App\Models\Propietario;
@@ -66,7 +67,7 @@ class ShareContributionFilamentTest extends TestCase
     {
         $owner = Propietario::factory()->create();
         $opening = app(ShareContributionService::class)->recordOpening($owner, '50', '1000', null, null, 'opening', $this->admin);
-        Livewire::test(ListShareContributions::class)->set('activeTab', 'movimientos')->callTableAction('correct', $opening, [
+        Livewire::test(ListShareContributions::class)->set('activeTab', 'movimientos')->call('$refresh')->callTableAction('correct', $opening, [
             'corrected_amount' => '700', 'reason' => 'Corrección documentada', 'operation_key' => 'correct',
         ])->assertHasNoTableActionErrors();
         $this->assertSame('1000.00', $opening->fresh()->amount);
@@ -161,15 +162,18 @@ class ShareContributionFilamentTest extends TestCase
             ->assertSee('Resumen por socio')
             ->assertSee('Historial de movimientos')
             ->assertSee('Aportes registrados')
-            ->assertSee('Socios sin información')
-            ->assertSee('$0')
             ->assertSee('Historial desconocido')
             ->assertSee('Historial conocido');
+
+        Livewire::test(ShareContributionsStatWidget::class)
+            ->assertSee('Socios sin información')
+            ->assertSee('$0');
 
         $this->assertSame('resumen', $page->instance()->activeTab);
 
         // Estado de información por socio: $0 explícito ≠ histórico desconocido.
         $page->set('activeTab', 'movimientos')
+            ->call('$refresh')
             ->assertSee('Saldo histórico inicial')
             ->assertSee('Registrado explícitamente como $0');
     }
@@ -180,14 +184,15 @@ class ShareContributionFilamentTest extends TestCase
         $opening = app(ShareContributionService::class)->recordOpening($owner, '10', '500', null, 'Observación original', 'opening', $this->admin);
         app(ShareHoldingService::class)->initializeHistorical(Propietario::factory()->create(), '5', null, 'unknown-hist', 'Sin registro', $this->admin);
 
-        Livewire::test(ListShareContributions::class)
+        $page = Livewire::test(ListShareContributions::class)
             ->set('activeTab', 'movimientos')
             ->filterTable('informacion', 'desconocida')
             ->assertCanNotSeeTableRecords([$opening])
             ->set('tableFilters', ['informacion' => ['value' => 'completa']])
             ->assertCanSeeTableRecords([$opening])
             ->set('tableFilters', [])
-            ->callTableAction('detail', $opening)
-            ->assertSee('Observación original');
+            ->mountTableAction('detail', $opening);
+
+        $this->assertStringContainsString('Observación original', $page->instance()->getMountedAction()->getModalContent()->render());
     }
 }

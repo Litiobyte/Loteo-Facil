@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CommunityLogoController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DocumentFileController;
 use Illuminate\Support\Facades\Route;
@@ -22,3 +23,5 @@ Route::get('/health', function () {
 Route::get('/documents/{document}/{action}', DocumentFileController::class)
     ->whereIn('action', ['preview', 'download'])
     ->name('documents.file');
+
+Route::get('/community/logo', CommunityLogoController::class)->middleware('auth')->name('community.logo');

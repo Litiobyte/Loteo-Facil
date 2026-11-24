@@ -23,6 +23,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class CommunitySettingResource extends Resource
 {
@@ -57,7 +58,19 @@ class CommunitySettingResource extends Resource
         return $schema->components([
             TextInput::make('community_name')->label('Nombre de la comunidad')->maxLength(120)->columnSpanFull(),
             FileUpload::make('logo_path')->label('Logotipo de la comunidad (opcional)')
-                ->disk('public')->directory('community-logos')->visibility('public')
+                ->disk('documents')->directory('community-logos')->visibility('private')
+                ->getUploadedFileUsing(function (string $file): ?array {
+                    $settings = CommunitySetting::current();
+                    if ($file !== $settings->logo_path || ! preg_match('/\Acommunity-logos\/[a-zA-Z0-9]{40}\.(png|jpg|jpeg|webp)\z/', $file)) {
+                        return null;
+                    }
+                    $disk = Storage::disk('documents');
+                    if (! $disk->exists($file)) {
+                        return null;
+                    }
+
+                    return ['name' => basename($file), 'size' => $disk->size($file), 'type' => $disk->mimeType($file), 'url' => route('community.logo')];
+                })
                 ->image()->acceptedFileTypes(['image/png', 'image/jpeg', 'image/webp'])
                 ->maxSize(2048)->rules(['dimensions:max_width=4096,max_height=4096', 'extensions:png,jpg,jpeg,webp'])
                 ->preventFilePathTampering()->storeFiles(false)

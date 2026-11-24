@@ -2,6 +2,7 @@
 
 namespace App\Domain\Owners\Services;
 
+use App\Domain\Documents\Services\PrivateStorageService;
 use App\Domain\Expenses\Enums\ExpenseDistributionType;
 use App\Domain\Expenses\Enums\ExpenseStatus;
 use App\Models\CommunitySetting;
@@ -71,9 +72,15 @@ class CommunitySettingsService
                 }
                 $before = $settings->only(array_keys($data));
                 if (($data['logo_path'] ?? null) instanceof UploadedFile) {
-                    $storedLogo = $data['logo_path']->storePublicly('community-logos', 'public');
-                    if (! $storedLogo) {
-                        throw ValidationException::withMessages(['logo_path' => 'No fue posible guardar el logotipo. Intente nuevamente.']);
+                    $storedLogo = 'community-logos/'.$data['logo_path']->hashName();
+                    $stream = fopen($data['logo_path']->getRealPath(), 'rb');
+                    if ($stream === false) {
+                        throw ValidationException::withMessages(['logo_path' => 'No fue posible leer el logotipo.']);
+                    }
+                    try {
+                        app(PrivateStorageService::class)->putStream($storedLogo, $stream);
+                    } finally {
+                        fclose($stream);
                     }
                     $data['logo_path'] = $storedLogo;
                 }
@@ -88,7 +95,7 @@ class CommunitySettingsService
             });
         } catch (Throwable $exception) {
             if ($storedLogo) {
-                Storage::disk('public')->delete($storedLogo);
+                Storage::disk('documents')->delete($storedLogo);
             }
 
             throw $exception;

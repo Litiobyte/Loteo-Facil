@@ -130,9 +130,9 @@ class DashboardTest extends TestCase
     #[DataProvider('communityLogos')]
     public function test_community_name_is_visible_only_with_default_logo_in_owner_panel(?string $path, bool $exists, bool $showName): void
     {
-        Storage::fake('public');
+        Storage::fake('documents');
         if ($exists) {
-            Storage::disk('public')->put($path, 'logo');
+            Storage::disk('documents')->put($path, 'logo');
         }
 
         CommunitySetting::query()->whereKey(1)->update([
