@@ -116,7 +116,7 @@ class LoteMapFeatureTest extends TestCase
         $this->assertTrue($feature['properties']['is_own']);
 
         // Asignacion inactiva no es propia
-        $this->lote->propietarios()->updateExistingPivot($propietario->id, ['status' => 'ended']);
+        $this->lote->propietarios()->updateExistingPivot($propietario->id, ['status' => 'unassigned']);
         $collection = $this->service->publishedGeoJson($this->etapa->id, false);
         $feature = collect($collection['features'])->first(fn ($f) => $f['id'] === $geometry->id);
         $this->assertFalse($feature['properties']['is_own']);

@@ -37,9 +37,9 @@ class MisLotesResourceTest extends TestCase
         foreach ($lots as $lot) {
             $this->assign($lot, $owner);
         }
-        $this->assign($lots->first(), $other, 'ended');
+        $this->assign($lots->first(), $other, 'unassigned');
         $inactive = Lote::factory()->create(['metros_cuadrados' => 90000]);
-        $this->assign($inactive, $owner, 'ended');
+        $this->assign($inactive, $owner, 'unassigned');
         $foreign = Lote::factory()->create(['metros_cuadrados' => 80000]);
         $this->assign($foreign, $other);
         $this->actingAs($user);
@@ -105,7 +105,7 @@ class MisLotesResourceTest extends TestCase
         $foreign = Lote::factory()->create(['codigo' => 'FOREIGN-CARD']);
         $inactive = Lote::factory()->create(['codigo' => 'INACTIVE-CARD']);
         $this->assign($foreign, $other);
-        $this->assign($inactive, $owner, 'ended');
+        $this->assign($inactive, $owner, 'unassigned');
         $this->actingAs($user);
         $page = Livewire::test(ListMisLotes::class)->callAction('toggleLayout')
             ->assertSee('No se encontraron lotes.')
@@ -162,7 +162,7 @@ class MisLotesResourceTest extends TestCase
         [, $other] = $this->createOwner();
         $lot = Lote::factory()->create(['notas' => 'Nota del lote propio', 'valor_lote' => 987654321]);
         $this->assign($lot, $owner);
-        $this->assign($lot, $other, 'ended');
+        $this->assign($lot, $other, 'unassigned');
         $this->actingAs($user);
 
         $url = LoteResource::getUrl('view', ['record' => $lot], panel: 'owner');
@@ -190,7 +190,7 @@ class MisLotesResourceTest extends TestCase
         $foreign = Lote::factory()->create();
         $inactive = Lote::factory()->create();
         $this->assign($foreign, $other);
-        $this->assign($inactive, $owner, 'ended');
+        $this->assign($inactive, $owner, 'unassigned');
         $this->actingAs($user);
 
         foreach ([$foreign, $inactive] as $lot) {
@@ -206,7 +206,7 @@ class MisLotesResourceTest extends TestCase
         $this->actingAs($user);
         $page = Livewire::test(ViewLote::class, ['record' => $lot->id])->assertOk();
 
-        $lot->propietarios()->updateExistingPivot($owner->id, ['status' => 'ended']);
+        $lot->propietarios()->updateExistingPivot($owner->id, ['status' => 'unassigned']);
 
         $page->call('$refresh')->assertForbidden();
     }
