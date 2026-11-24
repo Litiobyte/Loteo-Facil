@@ -237,6 +237,33 @@ Matriz de acceso por panel:
 - Scope de datos: cada propietario solo puede ver su propio registro.
 - Sin acciones de crear/editar/eliminar en el panel propietario.
 
+## Importaciones financieras historicas (etapas 0-6)
+
+Modulo para incorporar historia financiera desde planillas o sistemas anteriores,
+con integridad de caja, balances y estados de cuenta. Fuente de verdad del modulo:
+`docs/IMPORTACION_FINANCIERA_PROGRESS.md`.
+
+- Wizard en grupo «Importaciones» del panel admin; el modo financiero es
+  exclusivo de `super_admin` (carga, mapeo, previsualizacion, correccion previa,
+  confirmacion atomica por lote y resultados por fila con reintento de fallidas).
+- Movimientos admitidos: saldos iniciales (deudor y acreedor), gastos historicos
+  (solo registrar, distribucion con datos actuales confirmados, cobros explicitos),
+  cobros (vinculado, con gasto de respaldo, apertura), recaudaciones
+  (automatica FIFO, manual, sin aplicacion) y ajustes no monetarios.
+- Idempotencia por identidad externa compartida: reimportar el mismo archivo no
+  duplica; contenido distinto exige revision manual (`conflict`).
+- Guard de periodos cerrados por fecha efectiva, revalidado dentro de la
+  transaccion; no se reabren periodos ni se ejecutan cierres automaticos.
+- Los ajustes no monetarios y las aperturas no tocan caja; los pagos reconocidos
+  sin comprobante si la tocan y quedan distinguidos por evidencia.
+- Conciliacion historica: pagina admin «Conciliacion historica» (solo
+  `super_admin`) con desglose por propietario, reconocimiento de pagos sin
+  comprobante con autorizante y clasificacion manual de diferencias; nunca hay
+  correccion automatica.
+- QA (Etapa 7): suite completa en SQLite y validacion sobre MySQL real con
+  migraciones, colacion `utf8mb4_unicode_ci` y carrera de procesos sobre
+  aplicaciones de pagos (`MysqlConcurrencyQaTest`, se omite fuera de MySQL).
+
 ## Pruebas
 
 Ejecutar suite:
